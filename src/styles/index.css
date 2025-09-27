@@ -1,0 +1,205 @@
+body{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+    height: 100%;
+}
+p{
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+}
+.wrapper{
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    flex-direction: column;
+    font-family: 'Inter', sans-serif;
+}
+.form{
+    background-color: #DFDFDF;
+    padding: 30px 50px;
+    width: 40%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+.input-group{
+    width: 100%;
+    font-weight: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.inputLogin{
+  width: 100% -20px;
+  background-color: white;
+  border: 0;
+  padding: 10px;
+}
+.inputLogin:focus{
+  outline: none;
+  box-shadow: 0 0 5px #9C9C9C;
+}
+.buttonLogin{
+  margin-top: 10px;
+  width: 60%;
+  padding: 10px;
+  border: 0;
+  background-color: #A71A22;
+  color: #fffbfe;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  text-transform: capitalize;
+  font-weight: 600;
+  font-size: 16px;
+  border: 1px solid black;
+}
+.buttonLogin:hover{
+  cursor: pointer;
+  background-color: #7E151C;
+}
+.buttonLogin:active{
+  background-color: #5C1014;
+}
+.errorText{
+  color: red;
+  font-size: 14px;
+}
+header{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  height: 50px;
+}
+.logoBlock{
+  flex: 1;
+  background-color: lightblue;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.navBlock{
+  flex: 4;
+  background-color: lightgray;
+  height: 50px;
+  display: flex;
+  align-items: center;
+}
+.content {
+  display: flex;
+  flex: 1;               /* растягиваем на всю высоту родителя */
+  height: calc(100% - 50px); /* вычитаем header */
+  width: 100%;
+}
+
+.sidebar {
+  flex: 1;               /* 1/4 ширины можно регулировать */
+  display: flex;
+  flex-direction: column;
+  background-color: #f1f1f1;
+}
+
+.chat {
+  flex: 4;               /* основное пространство */
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+}
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6); /* затемнение */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.modal {
+  background: white;
+  padding: 2rem;
+  border-radius: 10px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.chatContainer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;             /* растягивается по высоте родителя .chat */
+  height: 100%;
+}
+
+.chatContent {
+  flex: 1;             /* занимает всё доступное место внутри chatContainer */
+  overflow-y: auto;    /* появится скролл, если сообщений много */
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chatInput {
+  flex-shrink: 0;      /* фиксируем input внизу */
+  display: flex;
+  gap: 5px;
+  padding: 10px;
+  background-color: #f0f0f0;
+  margin: 20px;
+  border-radius: 10px;
+}
+
+
+.inputButton{
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.inputField{
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  padding: 0px 20px;
+}
+.chatMessage{
+  margin: 10px  20px  0px  20px;
+  padding: 10px;
+  border-radius: 10px;
+  display: inline-block;
+  font-size: 16px;
+  max-width: 70%;
+}
+.chatMessage:first-child{
+  margin-top: 20px;
+}
+.userMessage {
+  background: #cce5ff;
+  align-self: flex-end;
+}
+
+.systemMessage {
+  background: #eee;
+  align-self: flex-start;
+}
+.iconButton{
+  width: 20px;
+  height: 20px;
+}
