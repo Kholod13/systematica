@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import sendIcon from "../assets/send.png";
-import plusIcon from "../assets/plus.png";
+import sendIcon from "../assets/send-white.png";
+import plusIcon from "../assets/plus-white.png";
+import questionIcon from "../assets/question-white.png";
+import Settings from "./Settings"; // 🔹 импортируем новый компонент
 
 function Agent({ id }) {
   const params = useParams();
@@ -9,12 +11,13 @@ function Agent({ id }) {
 
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
+  const [showSettings, setShowSettings] = useState(false); // 🔹 переключатель
 
   const fileInputRef = useRef(null);
 
-  // Сбрасываем сообщения при смене agentId
   useEffect(() => {
     setMessages([{ sender: "system", text: `Это агент #${agentId}` }]);
+    setShowSettings(false); // 🔹 при смене агента возвращаем чат
   }, [agentId]);
 
   const handleSend = () => {
@@ -54,52 +57,63 @@ function Agent({ id }) {
 
   return (
     <div className="chatContainer">
-      <div className="chatContent">
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`chatMessage ${msg.sender === "user" ? "userMessage" : "systemMessage"}`}
-          >
-            {msg.type === "image" ? (
-              <div>
-                <p>📷 {msg.name}</p>
-                <img
-                  src={msg.src}
-                  alt={msg.name}
-                  style={{ maxWidth: "200px", borderRadius: "8px", marginTop: "5px" }}
-                />
-              </div>
-            ) : (
-              <p>{msg.text}</p>
-            )}
-          </div>
-        ))}
-      </div>
+        {showSettings ? (
+        <Settings onBack={() => setShowSettings(false)} /> // 🔹 кнопка вернет чат
+        ) : (
+        <>
+            <div className="chatContent">
+            {messages.map((msg, index) => (
+                <div
+                key={index}
+                className={`chatMessage ${msg.sender === "user" ? "userMessage" : "systemMessage"}`}
+                >
+                {msg.type === "image" ? (
+                    <div>
+                    <p>📷 {msg.name}</p>
+                    <img
+                        src={msg.src}
+                        alt={msg.name}
+                        style={{ maxWidth: "200px", borderRadius: "8px", marginTop: "5px" }}
+                    />
+                    </div>
+                ) : (
+                    <p>{msg.text}</p>
+                )}
+                </div>
+            ))}
+            </div>
 
-      <div className="chatInput">
-        <button className="inputButton" onClick={handleAttachClick}>
-          <img className="iconButton" src={plusIcon} alt="Attach"/>
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: "none" }}
-          onChange={handleFileChange}
-        />
+            <div className="chatInput">
+            <button className="inputButton" onClick={handleAttachClick}>
+                <img className="iconButton" src={plusIcon} alt="Attach" />
+            </button>
 
-        <input
-          className="inputField"
-          type="text"
-          placeholder="Напишіть свій запит..."
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-        />
+            <button className="inputButton" onClick={() => setShowSettings(true)}>
+                <img className="iconButton" src={questionIcon} alt="Settings" />
+            </button>
 
-        <button className="inputButton" onClick={handleSend}>
-          <img className="iconButton" src={sendIcon} alt="Send"/>
-        </button>
-      </div>
+            <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                onChange={handleFileChange}
+            />
+
+            <input
+                className="inputField"
+                type="text"
+                placeholder="Напишіть свій запит..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            />
+
+            <button className="inputButton" onClick={handleSend}>
+                <img className="iconButton" src={sendIcon} alt="Send" />
+            </button>
+            </div>
+        </>
+        )}
     </div>
   );
 }

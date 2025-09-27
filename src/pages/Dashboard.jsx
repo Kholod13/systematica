@@ -26,7 +26,7 @@ function Dashboard() {
           <img src={logo} alt="Vite logo" height={40} />
         </div>
         <div className="navBlock">
-          <p>GPT</p>
+          <p style={{marginLeft: "40px", fontWeight: 600, fontSize: "18px"}}>GPT</p>
         </div>
       </header>
 

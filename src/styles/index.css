@@ -10,6 +10,14 @@ p{
   padding: 0;
   font-size: 16px;
 }
+.fade {
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.fade.show {
+  opacity: 1;
+}
 .wrapper{
     width: 100%;
     height: 100vh;
@@ -59,7 +67,6 @@ p{
   text-transform: capitalize;
   font-weight: 600;
   font-size: 16px;
-  border: 1px solid black;
 }
 .buttonLogin:hover{
   cursor: pointer;
@@ -80,15 +87,12 @@ header{
 }
 .logoBlock{
   flex: 1;
-  background-color: lightblue;
   height: 50px;
   display: flex;
   align-items: center;
-  justify-content: center;
 }
 .navBlock{
   flex: 4;
-  background-color: lightgray;
   height: 50px;
   display: flex;
   align-items: center;
@@ -99,7 +103,6 @@ header{
   height: calc(100% - 50px); /* вычитаем header */
   width: 100%;
 }
-
 .sidebar {
   flex: 1;               /* 1/4 ширины можно регулировать */
   display: flex;
@@ -159,18 +162,24 @@ header{
   margin: 20px;
   border-radius: 10px;
 }
-
-
 .inputButton{
-  background-color: #4CAF50;
+  background-color: #A71A22;
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.inputButton:hover{
+  background-color: #7E151C;
+  cursor: pointer;
+}
+.inputButton:active{
+  background-color: #5C1014;
 }
 .inputField{
   flex: 1;
@@ -178,6 +187,7 @@ header{
   outline: none;
   font-size: 16px;
   padding: 0px 20px;
+  border-radius: 20px;
 }
 .chatMessage{
   margin: 10px  20px  0px  20px;
@@ -191,13 +201,16 @@ header{
   margin-top: 20px;
 }
 .userMessage {
-  background: #cce5ff;
+  background: #5C1014;
   align-self: flex-end;
+  color: white;
 }
 
 .systemMessage {
-  background: #eee;
+  background: #A71A22;
   align-self: flex-start;
+  font-family: 'Inter', sans-serif;
+  color: white;
 }
 .iconButton{
   width: 20px;

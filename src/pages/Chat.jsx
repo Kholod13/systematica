@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import sendIcon from "../assets/send.png";
-import plusIcon from "../assets/plus.png";
+import sendIcon from "../assets/send-white.png";
+import plusIcon from "../assets/plus-white.png";
 
 function Chat({ id }) {
   const params = useParams();
