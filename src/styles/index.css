@@ -107,7 +107,6 @@ header{
   flex: 1;               /* 1/4 ширины можно регулировать */
   display: flex;
   flex-direction: column;
-  background-color: #f1f1f1;
 }
 
 .chat {
@@ -160,7 +159,7 @@ header{
   padding: 10px;
   background-color: #f0f0f0;
   margin: 20px;
-  border-radius: 10px;
+  border-radius: 20px;
 }
 .inputButton{
   background-color: #A71A22;
@@ -205,7 +204,6 @@ header{
   align-self: flex-end;
   color: white;
 }
-
 .systemMessage {
   background: #A71A22;
   align-self: flex-start;
@@ -215,4 +213,47 @@ header{
 .iconButton{
   width: 20px;
   height: 20px;
+}
+.sidebarTitle{
+  background-color: #E8E8E8;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  border-radius: 0px 15px 15px 0px;
+}
+.sidebarTitle p{
+  font-size: 20px;
+}
+.sidebarItem{
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  text-decoration: none;
+}
+.sidebarItem p{
+  color: black;
+  text-decoration: none;
+}
+.sidebarItem :hover{
+  color: #A71A22;
+}
+.sidebarItem a{
+  text-decoration: none;
+  display: block;
+  width: 100%;
+}
+.addChatButton {
+  border: 0;
+  background-color: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer; /* курсор как на кнопке */
+  border-radius: 50%; /* для круглого эффекта */
+  transition: box-shadow 0.3s ease; /* плавность */
+  
+}
+.addChatButton:hover {
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.3); /* тень при hover */
 }

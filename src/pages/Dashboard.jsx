@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import logo from '../assets/logo.svg';
 import { Routes, Route, Link, Outlet } from 'react-router-dom';
+import plusIconBlack from "../assets/plus.png";
 
 function Dashboard() {
   const chats = [0, 1, 2, 3, 4]; // Пример списка чатов
@@ -33,24 +34,28 @@ function Dashboard() {
       <main className="content">
         {/* Sidebar */}
         <aside className="sidebar">
-          <p>Агенти</p>
+          <div className='sidebarTitle'>
+            <p>Агенти</p>
+          </div>
           <ul style={{ listStyle: "none", padding: 0 }}>
             {agents.map((id) => (
-              <li key={id}>
-                <Link to={`agent/${id}`}>Агент {id}</Link>
+              <li className='sidebarItem' key={id}>
+                <Link to={`agent/${id}`}><p>Агент {id}</p></Link>
               </li>
             ))}
           </ul>
 
-          <div>
+          <div className='sidebarTitle'>
             <p>Чати</p>
-            <button onClick={() => setIsModalOpen(true)}>+ Создать чат</button>
+            <button className='addChatButton' onClick={() => setIsModalOpen(true)}>
+              <img style={{width: '15px'}} src={plusIconBlack} alt='Add'></img>
+            </button>
           </div>
 
           <ul style={{ listStyle: "none", padding: 0 }}>
             {chats.map((id) => (
-              <li key={id}>
-                <Link to={`chat/${id}`}>Чат {id}</Link>
+              <li className='sidebarItem' key={id}>
+                <Link to={`chat/${id}`}><p>Чат {id}</p></Link>
               </li>
             ))}
           </ul>
@@ -66,22 +71,27 @@ function Dashboard() {
       {isModalOpen && (
         <div className="modalOverlay">
           <div className="modal">
-            <h3>Создать новый чат</h3>
+            <p>Назва чату</p>
             <input
               type="text"
-              placeholder="Введите название"
+              placeholder="Введіть назву"
               value={input1}
               onChange={(e) => setInput1(e.target.value)}
+              className='inputLogin'
+              style={{ outline: 'none', boxShadow: '0 0 5px #9C9C9C'}}
             />
+            <p>Модель чату</p>
             <input
               type="text"
-              placeholder="Введите описание"
+              placeholder="Введіть модель"
               value={input2}
               onChange={(e) => setInput2(e.target.value)}
+              className='inputLogin'
+              style={{ outline: 'none', boxShadow: '0 0 5px #9C9C9C'}}
             />
-            <div style={{ marginTop: "1rem" }}>
-              <button onClick={handleCreate}>Create</button>
-              <button onClick={() => setIsModalOpen(false)}>Cancel</button>
+            <div style={{ display: 'flex', gap: '30px', padding: '10px' }}>
+              <button className='buttonLogin' onClick={handleCreate}>Create</button>
+              <button className='buttonLogin' onClick={() => setIsModalOpen(false)}>Cancel</button>
             </div>
           </div>
         </div>
