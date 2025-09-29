@@ -18,15 +18,13 @@ p{
 .fade.show {
   opacity: 1;
 }
-.wrapper{
-    width: 100%;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: white;
-    flex-direction: column;
-    font-family: 'Inter', sans-serif;
+.wrapper {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column; /* вместо центрирования */
+  background-color: white;
+  font-family: 'Inter', sans-serif;
 }
 .form{
     background-color: #DFDFDF;
@@ -256,4 +254,71 @@ header{
 }
 .addChatButton:hover {
   box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.3); /* тень при hover */
+}
+ul{
+  overflow-y: auto;
+}
+/* adaptive design */
+@media (max-width: 1023px)  {
+  html{
+    height: 100%;
+  }
+
+  body{
+    height: 100%;
+    background-color: red;
+  }
+  .logoBlock img{
+    height: 30px;
+  }
+  p{
+    font-size: 11px;
+    font-weight: 400;
+  }
+  .chatInput{
+    padding: 5px;
+  }
+  .inputField{
+    font-size: 10px;
+    height: 30px;
+    padding: 0 5px;
+  }
+  .inputButton{
+    width: 30px;
+    height: 30px;
+  }
+  .sidebarItem, .sidebarTitle{
+    padding: 5px 10px;
+  }
+  .sidebarTitle p{
+    font-size: 14px;
+  }
+  .chatContent{
+    padding: 0px;
+    overflow-y: auto;
+  }
+  .chatMessage{
+    margin: 0px 10px 0 10px;
+  }
+}
+@media (max-width: 376px) {
+  .chat {
+    flex: 1;
+    width: 100%;
+  }
+    ul{
+    display: flex;
+    overflow-x: auto;
+  }
+  .sidebar {
+    width: 100%;
+    flex: unset;  /* чтобы не растягивалась */
+    order: -1;    /* можно поднять наверх */
+  }
+  .content{
+    flex-direction: column;
+  }
+  .chat{
+    overflow-y: auto;
+  }
 }

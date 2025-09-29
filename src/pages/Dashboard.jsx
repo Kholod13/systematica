@@ -4,7 +4,7 @@ import { Routes, Route, Link, Outlet } from 'react-router-dom';
 import plusIconBlack from "../assets/plus.png";
 
 function Dashboard() {
-  const chats = [0, 1, 2, 3, 4]; // Пример списка чатов
+  const chats = [0, 1, 2, 3, 4,5,6,7,8,9,11,22,33,44,55,66,777,8888,789,7897,94]; // Пример списка чатов
   const agents = [1, 2]; // Пример списка агентов
 
   // 🔹 Стейты для модалки
