@@ -14,11 +14,16 @@ function Agent({ id }) {
   const [showSettings, setShowSettings] = useState(false); // 🔹 переключатель
 
   const fileInputRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     setMessages([{ sender: "system", text: `Это агент #${agentId}` }]);
     setShowSettings(false); // 🔹 при смене агента возвращаем чат
   }, [agentId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
@@ -81,6 +86,7 @@ function Agent({ id }) {
                 )}
                 </div>
             ))}
+            <div ref={messagesEndRef} />
             </div>
 
             <div className="chatInput">

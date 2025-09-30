@@ -300,6 +300,14 @@ ul{
   .chatMessage{
     margin: 0px 10px 0 10px;
   }
+  .modal{
+    padding: 20px;
+    gap: 0.3rem;
+    width: 200px;
+  }
+  .buttonLogin{
+    padding: 5px;
+  }
 }
 @media (max-width: 376px) {
   .chat {
