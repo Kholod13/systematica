@@ -135,7 +135,7 @@ function Chat({ id }) {
       <div className="chatContent">
         {messages.length === 0 ? (
           <div className="emptyChat">
-            Пока пусто
+            Повідомлень немає
           </div>
         ) : (
           messages.map((msg, index) => (
