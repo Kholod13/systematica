@@ -50,13 +50,59 @@ function Chat({ id }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
-    const newMessage = { sender: "user", text: inputValue };
-    setMessages((prev) => [...prev, newMessage]);
+  const handleSend = async () => {
+  if (!inputValue.trim()) return;
+
+  try {
+    const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat: chatId,
+        text: inputValue,
+        file: null,
+      }),
+    });
+
+    if (!resp.ok) {
+      console.error("Ошибка при отправке сообщения:", resp.status);
+      return;
+    }
+
+    const data = await resp.json();
+    console.log("✅ Ответ от сервера:", data);
+
+    // добавляем user_message
+    const userMsg = {
+      message_id: data.user_message.message_id,
+      sender: "user",
+      text: data.user_message.text,
+      messaged_at: data.user_message.messaged_at,
+    };
+
+    // добавляем ai_message, если есть
+    let aiMsg = null;
+    if (data.ai_message) {
+      aiMsg = {
+        message_id: data.ai_message.message_id,
+        sender: "system",
+        text: data.ai_message.text,
+        messaged_at: data.ai_message.messaged_at,
+      };
+    }
+
+    setMessages((prev) =>
+      aiMsg ? [...prev, userMsg, aiMsg] : [...prev, userMsg]
+    );
+
     setInputValue("");
-    // 🔹 здесь можно добавить POST на /messages/ для отправки
-  };
+  } catch (err) {
+    console.error("Ошибка при запросе:", err);
+  }
+};
+
 
   const handleAttachClick = () => fileInputRef.current.click();
 
@@ -87,27 +133,34 @@ function Chat({ id }) {
   return (
     <div className="chatContainer">
       <div className="chatContent">
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`chatMessage ${msg.sender === "user" ? "userMessage" : "systemMessage"}`}
-          >
-            {msg.type === "image" ? (
-              <div>
-                <p>📷 {msg.name}</p>
-                <img
-                  src={msg.src}
-                  alt={msg.name}
-                  style={{ maxWidth: "200px", borderRadius: "8px", marginTop: "5px" }}
-                />
-              </div>
-            ) : (
-              <p>{msg.text}</p>
-            )}
+        {messages.length === 0 ? (
+          <div className="emptyChat">
+            Пока пусто
           </div>
-        ))}
+        ) : (
+          messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`chatMessage ${msg.sender === "user" ? "userMessage" : "systemMessage"}`}
+            >
+              {msg.type === "image" ? (
+                <div>
+                  <p>📷 {msg.name}</p>
+                  <img
+                    src={msg.src}
+                    alt={msg.name}
+                    style={{ maxWidth: "200px", borderRadius: "8px", marginTop: "5px" }}
+                  />
+                </div>
+              ) : (
+                <p>{msg.text}</p>
+              )}
+            </div>
+          ))
+        )}
         <div ref={messagesEndRef} />
       </div>
+
 
       <div className="chatInput">
         <button className="inputButton" onClick={handleAttachClick}>

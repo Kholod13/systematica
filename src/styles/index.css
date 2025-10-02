@@ -151,6 +151,7 @@ header{
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
 }
 
 .chatInput {
@@ -281,6 +282,16 @@ pre {
   color: white;
   font-family: "Inter", sans-serif;
   line-height: 1.5;
+}
+.emptyChat {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #999;
+  font-size: 18px;
+  text-align: center;
+  pointer-events: none; /* чтобы не мешало кликам */
 }
 
 /* adaptive design */
