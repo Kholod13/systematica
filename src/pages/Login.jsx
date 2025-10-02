@@ -1,46 +1,44 @@
 import React, { useState } from "react";
 import { ENDPOINTS } from "../services/endpoints";
+import { setAccess } from "../services/auth";
+
 function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
 
-  // 🔹 эта функция будет вызываться при клике на кнопку
   const handleSubmit = async (e) => {
-    e.preventDefault(); // чтобы не перезагружалась страница
+    e.preventDefault();
     setError(null);
 
     try {
-      const response = await fetch(ENDPOINTS.LOGIN, { // <-- твой endpoint
+      const response = await fetch(ENDPOINTS.LOGIN, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: "koliakova",
-          password: "Test12345!",
+          username,
+          password,
         }),
+        credentials: "include", // важно, чтобы refresh-cookie сохранился
       });
 
       if (!response.ok) {
-        console.log("link server:", ENDPOINTS.LOGIN);
-        console.log("Статус ответа:", response.status);
         const text = await response.text();
-        console.log("Ответ сервера:", text);
+        console.log("Ошибка входа:", text);
         throw new Error("Неверный логин или пароль");
       }
 
       const data = await response.json();
-      console.log("✅ Ответ от API:", data);
+      console.log("✅ Успешный вход:", data);
 
-      // 🔹 Сохраняем access токен
-      localStorage.setItem("access", data.access);
+      // сохраняем access
+      setAccess(data.access);
 
-      // 🔹 Можно сохранить и данные пользователя
+      // сохраняем пользователя
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // 🔹 Перенаправление после входа
-      window.location.href = "/dashboard"; 
+      // редирект
+      window.location.href = "/dashboard";
     } catch (err) {
       setError(err.message);
     }

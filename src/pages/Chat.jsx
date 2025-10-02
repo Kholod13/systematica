@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import sendIcon from "../assets/send-white.png";
 import plusIcon from "../assets/plus-white.png";
+import { fetchWithAuth } from "../services/auth";
+import { ENDPOINTS } from "../services/endpoints";
 
 function Chat({ id }) {
   const params = useParams();
@@ -11,14 +13,39 @@ function Chat({ id }) {
   const [inputValue, setInputValue] = useState("");
 
   const fileInputRef = useRef(null);
-  const messagesEndRef = useRef(null); // 🔹 ссылка на конец чата
+  const messagesEndRef = useRef(null);
 
-  // Сбрасываем сообщения при смене chatId
+  // 🔹 Загружаем сообщения с сервера
   useEffect(() => {
-    setMessages([{ sender: "system", text: `Это чат #${chatId}` }]);
+    async function loadMessages() {
+      try {
+        const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}?chat=${chatId}`);
+        if (!resp.ok) {
+          console.error("Ошибка при загрузке сообщений:", resp.status);
+          return;
+        }
+        const data = await resp.json();
+        console.log("✅ Сообщения с API:", data);
+
+        // Преобразуем для удобного отображения
+        const formatted = data.map((m) => ({
+          message_id: m.message_id,
+          sender: m.is_user ? "user" : "system",
+          text: m.text,
+          file: m.file,
+          messaged_at: m.messaged_at,
+        }));
+
+        setMessages(formatted);
+      } catch (err) {
+        console.error("Ошибка при запросе сообщений:", err);
+      }
+    }
+
+    loadMessages();
   }, [chatId]);
 
-  // 🔹 Автоскролл вниз при новом сообщении
+  // Автоскролл вниз
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -28,11 +55,10 @@ function Chat({ id }) {
     const newMessage = { sender: "user", text: inputValue };
     setMessages((prev) => [...prev, newMessage]);
     setInputValue("");
+    // 🔹 здесь можно добавить POST на /messages/ для отправки
   };
 
-  const handleAttachClick = () => {
-    fileInputRef.current.click();
-  };
+  const handleAttachClick = () => fileInputRef.current.click();
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -80,19 +106,14 @@ function Chat({ id }) {
             )}
           </div>
         ))}
-        <div ref={messagesEndRef} /> {/* 🔹 пустой div для прокрутки */}
+        <div ref={messagesEndRef} />
       </div>
 
       <div className="chatInput">
         <button className="inputButton" onClick={handleAttachClick}>
-          <img className="iconButton" src={plusIcon} alt="Attach"/>
+          <img className="iconButton" src={plusIcon} alt="Attach" />
         </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: "none" }}
-          onChange={handleFileChange}
-        />
+        <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileChange} />
 
         <input
           className="inputField"
@@ -104,7 +125,7 @@ function Chat({ id }) {
         />
 
         <button className="inputButton" onClick={handleSend}>
-          <img className="iconButton" src={sendIcon} alt="Send"/>
+          <img className="iconButton" src={sendIcon} alt="Send" />
         </button>
       </div>
     </div>

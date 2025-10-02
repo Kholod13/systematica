@@ -25,6 +25,8 @@ p{
   flex-direction: column; /* вместо центрирования */
   background-color: white;
   font-family: 'Inter', sans-serif;
+  justify-content: center;
+  align-items: center;
 }
 .form{
     background-color: #DFDFDF;
@@ -108,10 +110,11 @@ header{
 }
 
 .chat {
-  flex: 4;               /* основное пространство */
+  flex: 4;
   display: flex;
   flex-direction: column;
   background-color: #fff;
+  min-width: 0; /* фикс для flex + overflow */
 }
 .modalOverlay {
   position: fixed;
@@ -258,6 +261,28 @@ header{
 ul{
   overflow-y: auto;
 }
+.settingsContent {
+  flex: 1; /* чтобы занимало всю область чата */
+  padding: 20px;
+  overflow-y: auto; /* если настроек много */
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.settingsItem {
+  background-color: #A71A22;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+  color: white;
+  font-family: "Inter", sans-serif;
+  line-height: 1.5;
+}
+
 /* adaptive design */
 @media (max-width: 1023px)  {
   html{
@@ -293,9 +318,16 @@ ul{
   .sidebarTitle p{
     font-size: 14px;
   }
-  .chatContent{
-    padding: 0px;
+  .chatContent {
+    flex: 1;
     overflow-y: auto;
+    overflow-x: hidden; /* убрать горизонтальный скролл */
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 100%; /* чтобы не вылазило за пределы .chat */
+    box-sizing: border-box; /* учитываем padding */
   }
   .chatMessage{
     margin: 0px 10px 0 10px;

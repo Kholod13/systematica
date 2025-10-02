@@ -24,7 +24,7 @@ function App() {
           {/* Если чат не выбран, редирект на chat_0 */}
           <Route index element={<Chat id="0" />} />
           <Route path="chat/:id" element={<Chat />} />
-          <Route path="agent/:id" element={<Agent />} />
+          <Route path="agent/:chatId/:agentId" element={<Agent />} />
         </Route>
       </Routes>
     </BrowserRouter>
