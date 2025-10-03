@@ -76,7 +76,7 @@ async function handleLogout() {
   async function handleCreateChat() {
     try {
       const modelId = models.find((m) => m.model_codename === selectedModel)?.model_id;
-      if (!modelId) throw new Error("Выберите модель");
+      if (!modelId) throw new Error("Виберіть модель");
 
       const newChat = await createChatAPI({
         chat_name: chatName,
@@ -155,15 +155,15 @@ async function handleLogout() {
       {isModalOpen && (
         <div className="modalOverlay">
           <div className="modal">
-            <h3>Создать новый чат</h3>
+            <h3>Створити новий чат</h3>
 
-            <p>Название чата:</p>
+            <p>Назва чата:</p>
             <input
               type="text"
               value={chatName}
               onChange={(e) => setChatName(e.target.value)}
               className="inputLogin"
-              placeholder="Введите название"
+              placeholder="Введіть назву"
             />
 
             <p style={{ marginTop: "10px" }}>Модель:</p>
@@ -178,8 +178,8 @@ async function handleLogout() {
             </select>
 
             <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-              <button className="buttonLogin" onClick={handleCreateChat}>Создать</button>
-              <button className="buttonLogin" onClick={() => setIsModalOpen(false)}>Отмена</button>
+              <button className="buttonLogin" onClick={handleCreateChat}>Створити</button>
+              <button className="buttonLogin" onClick={() => setIsModalOpen(false)}>Скасувати</button>
             </div>
           </div>
         </div>
