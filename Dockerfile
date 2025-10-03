@@ -31,4 +31,4 @@ COPY --from=build /app/dist ./dist
 EXPOSE 8080
 
 # Команда запуска
-CMD ["serve", "-s", "dist", "-l", "8080"]
+CMD ["sh", "-c", "serve -s dist -l $PORT"]
