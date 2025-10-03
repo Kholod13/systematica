@@ -11,18 +11,22 @@
     }
 }
 
+
 :{$PORT} {
     root * /app/dist
     encode gzip
-    file_server
-
-    # Для всех фронтенд маршрутов отдаём index.html
-    try_files {path} /index.html
 
     # Прокси для API
     @api {
         path /api/*
     }
     reverse_proxy @api https://systematica-erp-backend-production.up.railway.app
-}
 
+    # Для всех остальных фронтенд маршрутов отдаём index.html
+    @notApi {
+        not path /api/*
+    }
+    try_files {path} /index.html
+
+    file_server
+}

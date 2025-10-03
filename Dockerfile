@@ -22,6 +22,7 @@ RUN npm run build
 # -----------------------
 FROM caddy:latest
 
+
 WORKDIR /app
 
 # Копируем Caddyfile
