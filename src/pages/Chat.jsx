@@ -11,6 +11,7 @@ function Chat({ id }) {
 
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
+  const [isSending, setIsSending] = useState(false); // ✅ новый стейт
 
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -50,8 +51,30 @@ function Chat({ id }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async () => {
-  if (!inputValue.trim()) return;
+ const handleSend = async () => {
+  if (!inputValue.trim() || isSending) return; // ✅ блокируем повторный клик
+  setIsSending(true);
+
+  const userText = inputValue;
+  setInputValue("");
+
+  // 1. Добавляем сообщение пользователя
+  const userMsg = {
+    message_id: Date.now(), // временный ID
+    sender: "user",
+    text: userText,
+    messaged_at: new Date().toISOString(),
+  };
+
+  // 2. Добавляем заглушку "loading..."
+  const loadingMsg = {
+    message_id: "loading-" + Date.now(),
+    sender: "system",
+    text: "Systemtica AI формує відповідь...",
+    isLoading: true,
+  };
+
+  setMessages((prev) => [...prev, userMsg, loadingMsg]);
 
   try {
     const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}`, {
@@ -61,47 +84,60 @@ function Chat({ id }) {
       },
       body: JSON.stringify({
         chat: chatId,
-        text: inputValue,
+        text: userText,
         file: null,
       }),
     });
 
     if (!resp.ok) {
       console.error("Ошибка при отправке сообщения:", resp.status);
+      // заменим заглушку на ошибку
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.isLoading ? { ...m, text: "❌ Помилка при генерації" } : m
+        )
+      );
       return;
     }
 
     const data = await resp.json();
     console.log("✅ Ответ от сервера:", data);
 
-    // добавляем user_message
-    const userMsg = {
-      message_id: data.user_message.message_id,
-      sender: "user",
-      text: data.user_message.text,
-      messaged_at: data.user_message.messaged_at,
-    };
-
-    // добавляем ai_message, если есть
-    let aiMsg = null;
+    // 3. Обновляем заглушку нормальным сообщением
     if (data.ai_message) {
-      aiMsg = {
-        message_id: data.ai_message.message_id,
-        sender: "system",
-        text: data.ai_message.text,
-        messaged_at: data.ai_message.messaged_at,
-      };
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.isLoading
+            ? {
+                message_id: data.ai_message.message_id,
+                sender: "system",
+                text: data.ai_message.text,
+                messaged_at: data.ai_message.messaged_at,
+              }
+            : m
+        )
+      );
+    } else {
+      // если AI не ответил — заменим заглушку на ошибку
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.isLoading ? { ...m, text: "⚠️ Відповідь не отримана" } : m
+        )
+      );
     }
-
-    setMessages((prev) =>
-      aiMsg ? [...prev, userMsg, aiMsg] : [...prev, userMsg]
-    );
-
-    setInputValue("");
   } catch (err) {
     console.error("Ошибка при запросе:", err);
+    // заменим заглушку на ошибку
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.isLoading ? { ...m, text: "❌ Помилка сервера" } : m
+      )
+    );
+  } finally {
+    setIsSending(false);  // ✅ разблокируем после ответа
   }
 };
+
 
 
   const handleAttachClick = () => fileInputRef.current.click();
@@ -153,7 +189,7 @@ function Chat({ id }) {
                   />
                 </div>
               ) : (
-                <p>{msg.text}</p>
+                <p className={msg.isLoading ? "loading" : ""}>{msg.text}</p>
               )}
             </div>
           ))
@@ -174,10 +210,16 @@ function Chat({ id }) {
           placeholder="Напишіть свій запит..."
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          onKeyDown={(e) => e.key === "Enter" && !isSending && handleSend()} // ✅ Enter тоже блокируем
+          disabled={isSending} // ✅ блокируем инпут во время отправки
         />
 
-        <button className="inputButton" onClick={handleSend}>
+        <button
+          className="inputButton"
+          onClick={handleSend}
+          disabled={isSending} //block   button
+          style={{ opacity: isSending ? 0.5 : 1, cursor: isSending ? "not-allowed" : "pointer" }}
+        >
           <img className="iconButton" src={sendIcon} alt="Send" />
         </button>
       </div>

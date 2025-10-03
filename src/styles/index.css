@@ -293,7 +293,10 @@ pre {
   text-align: center;
   pointer-events: none; /* чтобы не мешало кликам */
 }
-
+.systemMessage.loading {
+  font-style: italic;
+  color: #aaa;
+}
 /* adaptive design */
 @media (max-width: 1023px)  {
   html{
