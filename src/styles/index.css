@@ -142,6 +142,8 @@ header{
   flex-direction: column;
   flex: 1;             /* растягивается по высоте родителя .chat */
   height: 100%;
+  position: relative;
+  transition: 0.5s ease;
 }
 
 .chatContent {
@@ -297,6 +299,32 @@ pre {
   font-style: italic;
   color: #aaa;
 }
+.scrollButton {
+  position: absolute;
+  left: 50%;
+  bottom: 100px; /* чуть выше input */
+  background: white;
+  border: none;
+  border-radius: 50%;
+  padding: 5px;
+  box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+  cursor: pointer;
+  transition: transform 1s ease;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scrollButton:hover {
+  background-color: #A71A22;
+}
+
+.scrollButton .scrollIcon {
+  width: 20px;
+  height: 20px;
+}
+
 /* adaptive design */
 @media (max-width: 1023px)  {
   html{

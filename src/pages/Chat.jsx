@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import sendIcon from "../assets/send-white.png";
 import plusIcon from "../assets/plus-white.png";
+import arrowIcon from "../assets/arrow.png";
 import { fetchWithAuth } from "../services/auth";
 import { ENDPOINTS } from "../services/endpoints";
 
@@ -15,6 +16,9 @@ function Chat({ id }) {
 
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const chatContentRef = useRef(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
 
   // 🔹 Загружаем сообщения с сервера
   useEffect(() => {
@@ -47,9 +51,29 @@ function Chat({ id }) {
   }, [chatId]);
 
   // Автоскролл вниз
+// Автоскролл вниз при добавлении сообщений
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 🔹 Следим за скроллом
+  useEffect(() => {
+    const chatEl = chatContentRef.current;
+    if (!chatEl) return;
+
+    const handleScroll = () => {
+      const isAtBottom =
+        chatEl.scrollHeight - chatEl.scrollTop <= chatEl.clientHeight + 5;
+      setShowScrollButton(!isAtBottom); // если не внизу → показываем стрелку
+    };
+
+    chatEl.addEventListener("scroll", handleScroll);
+    return () => chatEl.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
  const handleSend = async () => {
   if (!inputValue.trim() || isSending) return; // ✅ блокируем повторный клик
@@ -168,7 +192,7 @@ function Chat({ id }) {
 
   return (
     <div className="chatContainer">
-      <div className="chatContent">
+      <div className="chatContent" ref={chatContentRef}>
         {messages.length === 0 ? (
           <div className="emptyChat">
             Повідомлень немає
@@ -197,6 +221,12 @@ function Chat({ id }) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* 🔽 Кнопка "вниз" */}
+      {showScrollButton && (
+        <button className="scrollButton" onClick={scrollToBottom}>
+          <img src={arrowIcon} alt="Вниз" className="scrollIcon" />
+        </button>
+      )}
 
       <div className="chatInput">
         <button className="inputButton" onClick={handleAttachClick}>
