@@ -17,8 +17,6 @@ pids
 node_modules/
 
 # Build output
-dist/
-dist-ssr/
 
 # Local environment files
 *.local
