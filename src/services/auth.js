@@ -1,9 +1,10 @@
+// src/services/auth.js
 import { ENDPOINTS } from "../services/endpoints";
 
-// src/services/auth.js
 let accessToken = localStorage.getItem("access") || null;
 let refreshPromise = null;
 
+// ---------------- Access token ----------------
 export function setAccess(token) {
   accessToken = token;
   localStorage.setItem("access", token);
@@ -19,64 +20,70 @@ export function clearAccess() {
   localStorage.removeItem("user");
 }
 
-// 🔹 обновление access по refresh (refresh хранится в cookie HttpOnly)
+// ---------------- Refresh token via HttpOnly cookie ----------------
 async function callRefresh() {
+  // если уже идёт обновление, ждём текущий промис
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
-    const resp = await fetch(ENDPOINTS.REFRESH, {
-      method: "POST",
-      credentials: "include", // cookie обязательно
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
+    try {
+      const resp = await fetch(ENDPOINTS.REFRESH, {
+        method: "POST",
+        credentials: "include", // обязательно для HttpOnly cookie
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}), // backend берёт refresh из cookie
+      });
 
-    if (!resp.ok) {
-      throw new Error("Refresh failed");
+      if (!resp.ok) {
+        throw new Error(`Refresh failed with status ${resp.status}`);
+      }
+
+      const data = await resp.json();
+
+      if (!data.access) throw new Error("No access token in refresh response");
+
+      setAccess(data.access);
+      refreshPromise = null;
+      return accessToken;
+    } catch (e) {
+      refreshPromise = null;
+      clearAccess(); // токен недействителен
+      throw e;
     }
-
-    const data = await resp.json();
-    if (!data.access) throw new Error("No access in refresh response");
-
-    setAccess(data.access);
-    refreshPromise = null;
-    return accessToken;
   })();
 
-  try {
-    return await refreshPromise;
-  } catch (e) {
-    refreshPromise = null;
-    clearAccess();
-    throw e;
-  }
+  return refreshPromise;
 }
 
-// 🔹 универсальная обёртка для API-запросов
+// ---------------- Универсальный fetch с авто-refresh ----------------
 export async function fetchWithAuth(url, opts = {}, retry = true) {
-  opts.credentials = "include";
+  opts.credentials = "include"; // cookie отправляем всегда
   opts.headers = opts.headers ? { ...opts.headers } : {};
 
+  // добавляем Authorization, если есть access token
   if (accessToken) {
     opts.headers["Authorization"] = `Bearer ${accessToken}`;
   }
 
   let resp = await fetch(url, opts);
 
-  if (resp.status !== 401) {
-    return resp;
-  }
+  // если не 401 — возвращаем ответ сразу
+  if (resp.status !== 401) return resp;
 
+  // если уже пробовали обновить токен — возвращаем 401
   if (!retry) return resp;
 
   try {
-    await callRefresh();
+    await callRefresh(); // обновляем access
   } catch (e) {
+    console.error("❌ Refresh failed:", e);
     clearAccess();
-    window.location.href = "/login"; // принудительный logout
+    // можно принудительно редиректить на логин:
+    // window.location.href = "/login";
     throw e;
   }
 
+  // повторяем запрос с новым access
   if (accessToken) {
     opts.headers["Authorization"] = `Bearer ${accessToken}`;
   }

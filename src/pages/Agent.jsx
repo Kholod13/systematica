@@ -3,21 +3,25 @@ import { useParams } from "react-router-dom";
 import sendIcon from "../assets/send-white.png";
 import plusIcon from "../assets/plus-white.png";
 import questionIcon from "../assets/question-white.png";
+import arrowIcon from "../assets/arrow.png";
 import { fetchWithAuth } from "../services/auth";
 import { ENDPOINTS } from "../services/endpoints";
 import Settings from "./Settings";
 
 function Agent() {
-  const { chatId, agentId } = useParams(); // получаем параметры из URL
+  const { chatId, agentId } = useParams(); // chatId и agentId из URL
 
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const chatContentRef = useRef(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // Загружаем сообщения
+  // 🔹 Загружаем сообщения с сервера
   useEffect(() => {
     if (!chatId) return;
 
@@ -28,7 +32,6 @@ function Agent() {
           console.error("Ошибка при загрузке сообщений:", resp.status);
           return;
         }
-
         const data = await resp.json();
         const formatted = data.map((m) => ({
           message_id: m.message_id,
@@ -37,7 +40,6 @@ function Agent() {
           file: m.file,
           messaged_at: m.messaged_at,
         }));
-
         setMessages(formatted);
       } catch (err) {
         console.error("Ошибка при запросе сообщений:", err);
@@ -52,11 +54,102 @@ function Agent() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
-    setMessages((prev) => [...prev, { sender: "user", text: inputValue }]);
+  // 🔹 Следим за скроллом
+  useEffect(() => {
+    const chatEl = chatContentRef.current;
+    if (!chatEl) return;
+
+    const handleScroll = () => {
+      const isAtBottom =
+        chatEl.scrollHeight - chatEl.scrollTop <= chatEl.clientHeight + 5;
+      setShowScrollButton(!isAtBottom);
+    };
+
+    chatEl.addEventListener("scroll", handleScroll);
+    return () => chatEl.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleSend = async () => {
+    if (!inputValue.trim() || isSending) return;
+    setIsSending(true);
+
+    const userText = inputValue;
     setInputValue("");
-    // TODO: добавить POST-запрос для отправки сообщения на сервер
+
+    // Добавляем сообщение пользователя
+    const userMsg = {
+      message_id: Date.now(),
+      sender: "user",
+      text: userText,
+      messaged_at: new Date().toISOString(),
+    };
+
+    // Заглушка "loading..."
+    const loadingMsg = {
+      message_id: "loading-" + Date.now(),
+      sender: "system",
+      text: "Systemtica AI формує відповідь...",
+      isLoading: true,
+    };
+
+    setMessages((prev) => [...prev, userMsg, loadingMsg]);
+
+    try {
+      const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat: chatId,
+          text: userText,
+          file: null,
+        }),
+      });
+
+      if (!resp.ok) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.isLoading ? { ...m, text: "❌ Помилка при генерації" } : m
+          )
+        );
+        return;
+      }
+
+      const data = await resp.json();
+
+      if (data.ai_message) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.isLoading
+              ? {
+                  message_id: data.ai_message.message_id,
+                  sender: "system",
+                  text: data.ai_message.text,
+                  messaged_at: data.ai_message.messaged_at,
+                }
+              : m
+          )
+        );
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.isLoading ? { ...m, text: "⚠️ Відповідь не отримана" } : m
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Ошибка при запросе:", err);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.isLoading ? { ...m, text: "❌ Помилка сервера" } : m
+        )
+      );
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleAttachClick = () => fileInputRef.current.click();
@@ -75,7 +168,10 @@ function Agent() {
       };
       reader.readAsDataURL(file);
     } else {
-      setMessages((prev) => [...prev, { sender: "user", type: "file", text: `📎 ${file.name}` }]);
+      setMessages((prev) => [
+        ...prev,
+        { sender: "user", type: "file", text: `📎 ${file.name}` },
+      ]);
     }
 
     e.target.value = "";
@@ -91,28 +187,38 @@ function Agent() {
         <Settings agentId={agentId} onBack={() => setShowSettings(false)} />
       ) : (
         <>
-          <div className="chatContent">
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`chatMessage ${msg.sender === "user" ? "userMessage" : "systemMessage"}`}
-              >
-                {msg.type === "image" ? (
-                  <div>
-                    <p>📷 {msg.name}</p>
-                    <img
-                      src={msg.src}
-                      alt={msg.name}
-                      style={{ maxWidth: "200px", borderRadius: "8px", marginTop: "5px" }}
-                    />
-                  </div>
-                ) : (
-                  <p>{msg.text}</p>
-                )}
-              </div>
-            ))}
+          <div className="chatContent" ref={chatContentRef}>
+            {messages.length === 0 ? (
+              <div className="emptyChat">Повідомлень немає</div>
+            ) : (
+              messages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`chatMessage ${msg.sender === "user" ? "userMessage" : "systemMessage"}`}
+                >
+                  {msg.type === "image" ? (
+                    <div>
+                      <p>📷 {msg.name}</p>
+                      <img
+                        src={msg.src}
+                        alt={msg.name}
+                        style={{ maxWidth: "200px", borderRadius: "8px", marginTop: "5px" }}
+                      />
+                    </div>
+                  ) : (
+                    <p className={msg.isLoading ? "loading" : ""}>{msg.text}</p>
+                  )}
+                </div>
+              ))
+            )}
             <div ref={messagesEndRef} />
           </div>
+
+          {showScrollButton && (
+            <button className="scrollButton" onClick={scrollToBottom}>
+              <img src={arrowIcon} alt="Вниз" className="scrollIcon" />
+            </button>
+          )}
 
           <div className="chatInput">
             <button className="inputButton" onClick={handleAttachClick}>
@@ -130,10 +236,16 @@ function Agent() {
               placeholder="Напишіть свій запит..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onKeyDown={(e) => e.key === "Enter" && !isSending && handleSend()}
+              disabled={isSending}
             />
 
-            <button className="inputButton" onClick={handleSend}>
+            <button
+              className="inputButton"
+              onClick={handleSend}
+              disabled={isSending}
+              style={{ opacity: isSending ? 0.5 : 1, cursor: isSending ? "not-allowed" : "pointer" }}
+            >
               <img className="iconButton" src={sendIcon} alt="Send" />
             </button>
           </div>
