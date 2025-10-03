@@ -1,12 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './', // важно для корректной работы на Railway
+  define: {
+    'process.env.PORT': JSON.stringify(process.env.PORT),
+  },
   server: {
-    port: 5173,       // локальный dev порт
-    strictPort: true, // чтобы не менялся порт
+    host: true,
+    port: 5173,
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
+  preview: {
+    host: true,
+    port: process.env.PORT || 4173,
   },
 });
