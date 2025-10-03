@@ -27,8 +27,7 @@ RUN npm install -g serve
 # Копируем билд
 COPY --from=build /app/dist ./dist
 
-# Экспонируем порт Railway
-EXPOSE 8080
+EXPOSE $PORT
 
 # Команда запуска
-CMD ["sh", "-c", "serve -s dist -l $PORT"]
+CMD ["sh", "-c", "serve -s dist -l $PORT -H 0.0.0.0"]
