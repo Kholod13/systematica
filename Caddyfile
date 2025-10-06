@@ -1,0 +1,32 @@
+# global options
+{
+    admin off
+    persist_config off
+    auto_https off
+    log {
+        format json
+    }
+    servers {
+        trusted_proxies static private_ranges 100.0.0.0/8
+    }
+}
+
+
+:{$PORT} {
+    root * /app/dist
+    encode gzip
+
+    # Прокси для API
+    @api {
+        path /api/*
+    }
+    reverse_proxy @api https://systematica-erp-backend-production.up.railway.app
+
+    # Для всех остальных фронтенд маршрутов отдаём index.html
+    @notApi {
+        not path /api/*
+    }
+    try_files {path} /index.html
+
+    file_server
+}
