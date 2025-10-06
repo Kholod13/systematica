@@ -17,6 +17,9 @@ pids
 node_modules/
 
 # Build output
+dist/
+lap
+
 
 # Local environment files
 *.local
@@ -24,6 +27,7 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+
 
 # Editor directories and files
 .vscode/*
