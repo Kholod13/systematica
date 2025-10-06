@@ -55,6 +55,7 @@ function Login() {
             onChange={(e) => setUsername(e.target.value)}
             required
             className="inputLogin"
+            autoComplete="username"
           />
         </div>
         <div className="input-group">
@@ -65,6 +66,7 @@ function Login() {
             onChange={(e) => setPassword(e.target.value)}
             required
             className="inputLogin"
+            autoComplete="current-password"
           />
           {error && <p className="errorText">{error}</p>}
         </div>

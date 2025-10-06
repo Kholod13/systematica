@@ -21,11 +21,16 @@ function App() {
             </ProtectedRoute>
           }
         >
-          {/* Если чат не выбран, редирект на chat_0 */}
           <Route index element={<Chat id="0" />} />
           <Route path="chat/:id" element={<Chat />} />
           <Route path="agent/:chatId/:agentId" element={<Agent />} />
         </Route>
+
+        {/* Если корень — редиректим на /login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* 404 — если путь не найден */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );

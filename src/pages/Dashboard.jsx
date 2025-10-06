@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { fetchWithAuth } from "../services/auth";
 import { createChat as createChatAPI } from "../services/chats";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.svg";
 import plusIconBlack from "../assets/plus.png";
 import { ENDPOINTS } from "../services/endpoints";
-import { useNavigate } from "react-router-dom";
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -16,21 +15,15 @@ function Dashboard() {
   const [models, setModels] = useState([]);
   const [chatName, setChatName] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
+  const [hasRedirected, setHasRedirected] = useState(false);
 
-//logout button
-async function handleLogout() {
+  // Logout
+  async function handleLogout() {
     try {
-      const resp = await fetchWithAuth(ENDPOINTS.LOGOUT, {
-        method: "POST",
-      });
-
+      const resp = await fetchWithAuth(ENDPOINTS.LOGOUT, { method: "POST" });
       if (resp.ok) {
-        console.log("✅ Logout успешный");
-        // Удаляем локальные данные
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
-
-        // Перенаправляем на страницу логина
         navigate("/login");
       } else {
         const error = await resp.json();
@@ -40,25 +33,39 @@ async function handleLogout() {
     } catch (err) {
       console.error("Ошибка запроса logout:", err);
     }
-}
-
-  // Загружаем чаты
-  async function loadChats() {
-    try {
-      const resp = await fetchWithAuth(ENDPOINTS.CHATS);
-      if (resp.ok) {
-        const data = await resp.json();
-        const onlyChats = data.filter((c) => !c.agent || c.agent === 0);
-        const onlyAgentChats = data.filter((c) => c.agent && c.agent !== 0);
-        setChats(onlyChats);
-        setAgentChats(onlyAgentChats);
-      }
-    } catch (err) {
-      console.error("Ошибка при запросе чатов:", err);
-    }
   }
 
-  // Загружаем модели
+  // Load chats and redirect to first agent/chat
+
+  useEffect(() => {
+    async function loadChats() {
+      try {
+        const resp = await fetchWithAuth(ENDPOINTS.CHATS);
+        if (resp.ok) {
+          const data = await resp.json();
+          const onlyChats = data.filter((c) => !c.agent || c.agent === 0);
+          const onlyAgentChats = data.filter((c) => c.agent && c.agent !== 0);
+          setChats(onlyChats);
+          setAgentChats(onlyAgentChats);
+
+          // редирект только один раз
+          if (!hasRedirected) {
+            if (onlyAgentChats.length > 0) {
+              navigate(`agent/${onlyAgentChats[0].chat_id}/${onlyAgentChats[0].agent}`, { replace: true });
+            } else if (onlyChats.length > 0) {
+              navigate(`chat/${onlyChats[0].chat_id}`, { replace: true });
+            }
+            setHasRedirected(true);
+          }
+        }
+      } catch (err) {
+        console.error("Ошибка при запросе чатов:", err);
+      }
+    }
+    loadChats();
+  }, [navigate, hasRedirected]);
+
+  // Load models
   async function loadModels() {
     try {
       const resp = await fetchWithAuth(ENDPOINTS.MODELS);
@@ -72,19 +79,17 @@ async function handleLogout() {
     }
   }
 
-  // Создать чат
+  // Create chat
   async function handleCreateChat() {
     try {
       const modelId = models.find((m) => m.model_codename === selectedModel)?.model_id;
-      if (!modelId) throw new Error("Виберіть модель");
+      if (!modelId) throw new Error("Выберите модель");
 
       const newChat = await createChatAPI({
         chat_name: chatName,
         agent: null,
         model: modelId,
       });
-
-      console.log("✅ Чат создан:", newChat);
 
       if (!newChat.agent || newChat.agent === 0) {
         setChats((prev) => [...prev, newChat]);
@@ -99,10 +104,6 @@ async function handleLogout() {
       alert(err.message);
     }
   }
-
-  useEffect(() => {
-    loadChats();
-  }, []);
 
   return (
     <div className="wrapper">
@@ -151,21 +152,19 @@ async function handleLogout() {
         <section className="chat"><Outlet /></section>
       </main>
 
-      {/* Модалка */}
+      {/* Modal */}
       {isModalOpen && (
         <div className="modalOverlay">
           <div className="modal">
-            <h3>Створити новий чат</h3>
-
-            <p>Назва чата:</p>
+            <h3>Создать новый чат</h3>
+            <p>Название чата:</p>
             <input
               type="text"
               value={chatName}
               onChange={(e) => setChatName(e.target.value)}
               className="inputLogin"
-              placeholder="Введіть назву"
+              placeholder="Введите название"
             />
-
             <p style={{ marginTop: "10px" }}>Модель:</p>
             <select
               value={selectedModel}
@@ -178,8 +177,8 @@ async function handleLogout() {
             </select>
 
             <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-              <button className="buttonLogin" onClick={handleCreateChat}>Створити</button>
-              <button className="buttonLogin" onClick={() => setIsModalOpen(false)}>Скасувати</button>
+              <button className="buttonLogin" onClick={handleCreateChat}>Создать</button>
+              <button className="buttonLogin" onClick={() => setIsModalOpen(false)}>Отмена</button>
             </div>
           </div>
         </div>
