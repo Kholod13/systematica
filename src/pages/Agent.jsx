@@ -9,7 +9,7 @@ import { ENDPOINTS } from "../services/endpoints";
 import Settings from "./Settings";
 
 function Agent() {
-  const { chatId, agentId } = useParams(); // chatId и agentId из URL
+  const { chatId, agentId } = useParams();
 
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
@@ -21,7 +21,7 @@ function Agent() {
   const chatContentRef = useRef(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // 🔹 Загружаем сообщения с сервера
+  // 🔹 Загрузка сообщений
   useEffect(() => {
     if (!chatId) return;
 
@@ -33,6 +33,7 @@ function Agent() {
           return;
         }
         const data = await resp.json();
+
         const formatted = data.map((m) => ({
           message_id: m.message_id,
           sender: m.is_user ? "user" : "system",
@@ -40,6 +41,7 @@ function Agent() {
           file: m.file,
           messaged_at: m.messaged_at,
         }));
+
         setMessages(formatted);
       } catch (err) {
         console.error("Ошибка при запросе сообщений:", err);
@@ -49,7 +51,7 @@ function Agent() {
     loadMessages();
   }, [chatId]);
 
-  // Автоскролл вниз при новых сообщениях
+  // 🔹 Автоскролл вниз при добавлении сообщений
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -73,6 +75,23 @@ function Agent() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // 🔹 Форматирование текста (аналогично Chat.jsx)
+  function formatMessageText(text) {
+    if (!text) return "";
+
+    const safeText = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    return safeText
+      .replace(/\*([^*]+)\*/g, "<strong>$1</strong>") // *жирный*
+      .replace(/_([^_]+)_/g, "<em>$1</em>")           // _курсив_
+      .replace(/`([^`]+)`/g, "<code>$1</code>")       // `код`
+      .replace(/\n/g, "<br>");
+  }
+
+  // 🔹 Отправка сообщения
   const handleSend = async () => {
     if (!inputValue.trim() || isSending) return;
     setIsSending(true);
@@ -80,7 +99,6 @@ function Agent() {
     const userText = inputValue;
     setInputValue("");
 
-    // Добавляем сообщение пользователя
     const userMsg = {
       message_id: Date.now(),
       sender: "user",
@@ -88,7 +106,6 @@ function Agent() {
       messaged_at: new Date().toISOString(),
     };
 
-    // Заглушка "loading..."
     const loadingMsg = {
       message_id: "loading-" + Date.now(),
       sender: "system",
@@ -152,6 +169,7 @@ function Agent() {
     }
   };
 
+  // 🔹 Работа с файлами
   const handleAttachClick = () => fileInputRef.current.click();
 
   const handleFileChange = (e) => {
@@ -161,24 +179,25 @@ function Agent() {
     if (file.type.startsWith("image/")) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        setMessages((prev) => [
-          ...prev,
-          { sender: "user", type: "image", src: event.target.result, name: file.name },
-        ]);
+        const newMessage = {
+          sender: "user",
+          type: "image",
+          src: event.target.result,
+          name: file.name,
+        };
+        setMessages((prev) => [...prev, newMessage]);
       };
       reader.readAsDataURL(file);
     } else {
-      setMessages((prev) => [
-        ...prev,
-        { sender: "user", type: "file", text: `📎 ${file.name}` },
-      ]);
+      const newMessage = { sender: "user", type: "file", text: `📎 ${file.name}` };
+      setMessages((prev) => [...prev, newMessage]);
     }
 
     e.target.value = "";
   };
 
   if (!chatId || !agentId) {
-    return <p style={{ padding: "20px", color: "red" }}>Ошибка: chatId или agentId не указан</p>;
+    return <p style={{ padding: "20px", color: "red" }}>❌ Помилка: chatId або agentId не вказано</p>;
   }
 
   return (
@@ -194,7 +213,9 @@ function Agent() {
               messages.map((msg, index) => (
                 <div
                   key={index}
-                  className={`chatMessage ${msg.sender === "user" ? "userMessage" : "systemMessage"}`}
+                  className={`chatMessage ${
+                    msg.sender === "user" ? "userMessage" : "systemMessage"
+                  }`}
                 >
                   {msg.type === "image" ? (
                     <div>
@@ -202,11 +223,25 @@ function Agent() {
                       <img
                         src={msg.src}
                         alt={msg.name}
-                        style={{ maxWidth: "200px", borderRadius: "8px", marginTop: "5px" }}
+                        style={{
+                          maxWidth: "200px",
+                          borderRadius: "8px",
+                          marginTop: "5px",
+                        }}
                       />
                     </div>
                   ) : (
-                    <p className={msg.isLoading ? "loading" : ""}>{msg.text}</p>
+                    <p
+                      className={msg.isLoading ? "loading" : ""}
+                      dangerouslySetInnerHTML={{
+                        __html: formatMessageText(msg.text),
+                      }}
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        lineHeight: "1.5",
+                        wordBreak: "break-word",
+                      }}
+                    />
                   )}
                 </div>
               ))
@@ -224,7 +259,12 @@ function Agent() {
             <button className="inputButton" onClick={handleAttachClick}>
               <img className="iconButton" src={plusIcon} alt="Attach" />
             </button>
-            <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileChange} />
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              onChange={handleFileChange}
+            />
 
             <button className="inputButton" onClick={() => setShowSettings(true)}>
               <img className="iconButton" src={questionIcon} alt="Settings" />
@@ -244,7 +284,10 @@ function Agent() {
               className="inputButton"
               onClick={handleSend}
               disabled={isSending}
-              style={{ opacity: isSending ? 0.5 : 1, cursor: isSending ? "not-allowed" : "pointer" }}
+              style={{
+                opacity: isSending ? 0.5 : 1,
+                cursor: isSending ? "not-allowed" : "pointer",
+              }}
             >
               <img className="iconButton" src={sendIcon} alt="Send" />
             </button>
