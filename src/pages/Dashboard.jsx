@@ -5,6 +5,7 @@ import { Link, Outlet, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.svg";
 import plusIconBlack from "../assets/plus.png";
 import { ENDPOINTS } from "../services/endpoints";
+import { NavLink } from "react-router-dom";
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -122,7 +123,12 @@ function Dashboard() {
           <ul style={{ listStyle: "none", padding: 0 }}>
             {agentChats.map((chat) => (
               <li className="sidebarItem" key={chat.chat_id}>
-                <Link to={`agent/${chat.chat_id}/${chat.agent}`}><p>{chat.chat_name}</p></Link>
+                <NavLink
+                  to={`agent/${chat.chat_id}/${chat.agent}`}
+                  className={({ isActive }) => isActive ? "sidebarItemActive" : ""}
+                >
+                  <p>{chat.chat_name}</p>
+                </NavLink>
               </li>
             ))}
           </ul>
@@ -143,7 +149,12 @@ function Dashboard() {
           <ul style={{ listStyle: "none", padding: 0 }}>
             {chats.map((chat) => (
               <li className="sidebarItem" key={chat.chat_id}>
-                <Link to={`chat/${chat.chat_id}`}><p>{chat.chat_name}</p></Link>
+                <NavLink
+                  to={`chat/${chat.chat_id}`}
+                  className={({ isActive }) => isActive ? "sidebarItemActive" : ""}
+                >
+                  <p>{chat.chat_name}</p>
+                </NavLink>
               </li>
             ))}
           </ul>

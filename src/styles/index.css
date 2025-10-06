@@ -324,6 +324,13 @@ pre {
   width: 20px;
   height: 20px;
 }
+.sidebarItemActive{
+  font-weight: bold;
+  border-bottom: 2px solid #A71A22;
+}
+.sidebarItemActive p:hover{
+  color: black;
+}
 
 /* adaptive design */
 @media (max-width: 1023px)  {
