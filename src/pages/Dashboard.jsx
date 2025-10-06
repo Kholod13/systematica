@@ -167,14 +167,14 @@ function Dashboard() {
       {isModalOpen && (
         <div className="modalOverlay">
           <div className="modal">
-            <h3>Создать новый чат</h3>
-            <p>Название чата:</p>
+            <h3>Створити новий чат</h3>
+            <p>Назва чату:</p>
             <input
               type="text"
               value={chatName}
               onChange={(e) => setChatName(e.target.value)}
               className="inputLogin"
-              placeholder="Введите название"
+              placeholder="Введіть назву"
             />
             <p style={{ marginTop: "10px" }}>Модель:</p>
             <select
@@ -188,8 +188,8 @@ function Dashboard() {
             </select>
 
             <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-              <button className="buttonLogin" onClick={handleCreateChat}>Создать</button>
-              <button className="buttonLogin" onClick={() => setIsModalOpen(false)}>Отмена</button>
+              <button className="buttonLogin" onClick={handleCreateChat}>Створити</button>
+              <button className="buttonLogin" onClick={() => setIsModalOpen(false)}>Скасувати</button>
             </div>
           </div>
         </div>
