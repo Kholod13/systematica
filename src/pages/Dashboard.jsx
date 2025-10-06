@@ -84,7 +84,7 @@ function Dashboard() {
   async function handleCreateChat() {
     try {
       const modelId = models.find((m) => m.model_codename === selectedModel)?.model_id;
-      if (!modelId) throw new Error("Выберите модель");
+      if (!modelId) throw new Error("Оберіть модель");
 
       const newChat = await createChatAPI({
         chat_name: chatName,
