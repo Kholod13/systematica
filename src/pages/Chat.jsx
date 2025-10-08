@@ -13,11 +13,12 @@ function Chat({ id }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [expectedAnswer, setExpectedAnswer] = useState("Text"); // 👈 выбор формата ответа
 
   const fileInputRef = useRef(null);
-  const messagesEndRef = useRef(null);
   const chatContentRef = useRef(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
+  const messagesEndRef = useRef(null);
 
   // 🔹 Загрузка сообщений
   useEffect(() => {
@@ -29,25 +30,23 @@ function Chat({ id }) {
           return;
         }
         const data = await resp.json();
-
         const formatted = data.map((m) => ({
           message_id: m.message_id,
           sender: m.is_user ? "user" : "system",
           text: m.text,
           file: m.file,
+          filename: m.filename,
           messaged_at: m.messaged_at,
         }));
-
         setMessages(formatted);
       } catch (err) {
         console.error("Ошибка при запросе сообщений:", err);
       }
     }
-
     loadMessages();
   }, [chatId]);
 
-  // 🔹 Автоскролл вниз при добавлении сообщений
+  // 🔹 Автопрокрутка вниз
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -56,13 +55,11 @@ function Chat({ id }) {
   useEffect(() => {
     const chatEl = chatContentRef.current;
     if (!chatEl) return;
-
     const handleScroll = () => {
       const isAtBottom =
         chatEl.scrollHeight - chatEl.scrollTop <= chatEl.clientHeight + 5;
       setShowScrollButton(!isAtBottom);
     };
-
     chatEl.addEventListener("scroll", handleScroll);
     return () => chatEl.removeEventListener("scroll", handleScroll);
   }, []);
@@ -71,21 +68,20 @@ function Chat({ id }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // 🔹 Форматирование текста AI-сообщений
-function formatMessageText(text) {
-  if (!text) return "";
+  // 🔹 Форматирование текста
+  function formatMessageText(text) {
+    if (!text) return "";
+    const safeText = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    return safeText
+      .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
+      .replace(/_([^_]+)_/g, "<em>$1</em>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\n/g, "<br>");
+  }
 
-  const safeText = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  return safeText
-    .replace(/\*([^*]+)\*/g, "<strong>$1</strong>") // *жирный*
-    .replace(/_([^_]+)_/g, "<em>$1</em>")           // _курсив_
-    .replace(/`([^`]+)`/g, "<code>$1</code>")       // `код`
-    .replace(/\n/g, "<br>");
-}
   // 🔹 Отправка сообщения
   const handleSend = async () => {
     if (!inputValue.trim() || isSending) return;
@@ -114,10 +110,16 @@ function formatMessageText(text) {
       const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat: chatId, text: userText, file: null }),
+        body: JSON.stringify({
+          chat: chatId,
+          text: userText,
+          expected_answer: expectedAnswer, // 👈 добавляем выбор формата
+          file: null,
+        }),
       });
 
       if (!resp.ok) {
+        console.error("Ошибка при отправке:", resp.status);
         setMessages((prev) =>
           prev.map((m) =>
             m.isLoading ? { ...m, text: "❌ Помилка при генерації" } : m
@@ -127,15 +129,24 @@ function formatMessageText(text) {
       }
 
       const data = await resp.json();
+      console.log("📩 Ответ от сервера:", data);
 
       if (data.ai_message) {
+        const fileUrl = data.ai_message.file
+          ? `${import.meta.env.VITE_API_BASE_URL || ""}${data.ai_message.file}`
+          : null;
+
         setMessages((prev) =>
           prev.map((m) =>
             m.isLoading
               ? {
                   message_id: data.ai_message.message_id,
                   sender: "system",
-                  text: data.ai_message.text,
+                  text:
+                    data.ai_message.text ||
+                    (fileUrl ? "AI створив файл 📄" : ""),
+                  file: fileUrl,
+                  filename: data.ai_message.filename,
                   messaged_at: data.ai_message.messaged_at,
                 }
               : m
@@ -160,12 +171,11 @@ function formatMessageText(text) {
     }
   };
 
+  // 🔹 Работа с файлами
   const handleAttachClick = () => fileInputRef.current.click();
-
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     if (file.type.startsWith("image/")) {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -182,7 +192,6 @@ function formatMessageText(text) {
       const newMessage = { sender: "user", type: "file", text: `📎 ${file.name}` };
       setMessages((prev) => [...prev, newMessage]);
     }
-
     e.target.value = "";
   };
 
@@ -206,12 +215,41 @@ function formatMessageText(text) {
                     src={msg.src}
                     alt={msg.name}
                     style={{
-                      maxWidth: "200px",
+                      maxWidth: "250px",
                       borderRadius: "8px",
                       marginTop: "5px",
                     }}
                   />
                 </div>
+              ) : msg.file ? (
+                msg.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                  <img
+                    src={msg.file}
+                    alt={msg.filename || "AI-відповідь"}
+                    style={{
+                      maxWidth: "250px",
+                      borderRadius: "8px",
+                      marginTop: "5px",
+                    }}
+                  />
+                ) : (
+                  <div>
+                    <p>📎 {msg.filename || "Файл від AI"}</p>
+                    <a
+                      href={msg.file}
+                      download={msg.filename}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "#00bfff",
+                        textDecoration: "underline",
+                        fontWeight: "500",
+                      }}
+                    >
+                      Завантажити файл
+                    </a>
+                  </div>
+                )
               ) : (
                 <p
                   className={msg.isLoading ? "loading" : ""}
@@ -237,6 +275,38 @@ function formatMessageText(text) {
         </button>
       )}
 
+      {/* 🔹 Радио-кнопки выбора формата */}
+      <div className="formatSelector">
+        <label>
+          <input
+            type="radio"
+            value="Text"
+            checked={expectedAnswer === "Text"}
+            onChange={(e) => setExpectedAnswer(e.target.value)}
+          />
+          Текст
+        </label>
+        <label>
+          <input
+            type="radio"
+            value="Table"
+            checked={expectedAnswer === "Table"}
+            onChange={(e) => setExpectedAnswer(e.target.value)}
+          />
+          Таблиця
+        </label>
+        <label>
+          <input
+            type="radio"
+            value="Doc"
+            checked={expectedAnswer === "Doc"}
+            onChange={(e) => setExpectedAnswer(e.target.value)}
+          />
+          Документ
+        </label>
+      </div>
+
+      {/* 🔹 Ввод и кнопки */}
       <div className="chatInput">
         <button className="inputButton" onClick={handleAttachClick}>
           <img className="iconButton" src={plusIcon} alt="Attach" />
@@ -247,7 +317,6 @@ function formatMessageText(text) {
           style={{ display: "none" }}
           onChange={handleFileChange}
         />
-
         <input
           className="inputField"
           type="text"
@@ -257,7 +326,6 @@ function formatMessageText(text) {
           onKeyDown={(e) => e.key === "Enter" && !isSending && handleSend()}
           disabled={isSending}
         />
-
         <button
           className="inputButton"
           onClick={handleSend}
