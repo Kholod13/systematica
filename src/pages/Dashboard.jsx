@@ -94,8 +94,12 @@ function Dashboard() {
 
       if (!newChat.agent || newChat.agent === 0) {
         setChats((prev) => [...prev, newChat]);
+        // 🔹 редиректим сразу на созданный обычный чат
+        navigate(`chat/${newChat.chat_id}`, { replace: true });
       } else {
         setAgentChats((prev) => [...prev, newChat]);
+        // 🔹 редиректим на агентский чат
+        navigate(`agent/${newChat.chat_id}/${newChat.agent}`, { replace: true });
       }
 
       setIsModalOpen(false);

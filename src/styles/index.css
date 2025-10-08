@@ -214,6 +214,9 @@ header{
   font-family: 'Inter', sans-serif;
   color: white;
 }
+.systemMessage strong {
+  font-weight: 700;
+}
 .iconButton{
   width: 20px;
   height: 20px;
@@ -340,7 +343,6 @@ pre {
 
   body{
     height: 100%;
-    background-color: red;
   }
   .logoBlock img{
     height: 30px;

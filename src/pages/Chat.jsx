@@ -12,15 +12,14 @@ function Chat({ id }) {
 
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
-  const [isSending, setIsSending] = useState(false); // ✅ новый стейт
+  const [isSending, setIsSending] = useState(false);
 
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatContentRef = useRef(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
-
-  // 🔹 Загружаем сообщения с сервера
+  // 🔹 Загрузка сообщений
   useEffect(() => {
     async function loadMessages() {
       try {
@@ -30,9 +29,7 @@ function Chat({ id }) {
           return;
         }
         const data = await resp.json();
-        console.log("✅ Сообщения с API:", data);
 
-        // Преобразуем для удобного отображения
         const formatted = data.map((m) => ({
           message_id: m.message_id,
           sender: m.is_user ? "user" : "system",
@@ -50,8 +47,7 @@ function Chat({ id }) {
     loadMessages();
   }, [chatId]);
 
-  // Автоскролл вниз
-// Автоскролл вниз при добавлении сообщений
+  // 🔹 Автоскролл вниз при добавлении сообщений
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -64,7 +60,7 @@ function Chat({ id }) {
     const handleScroll = () => {
       const isAtBottom =
         chatEl.scrollHeight - chatEl.scrollTop <= chatEl.clientHeight + 5;
-      setShowScrollButton(!isAtBottom); // если не внизу → показываем стрелку
+      setShowScrollButton(!isAtBottom);
     };
 
     chatEl.addEventListener("scroll", handleScroll);
@@ -75,94 +71,94 @@ function Chat({ id }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
- const handleSend = async () => {
-  if (!inputValue.trim() || isSending) return; // ✅ блокируем повторный клик
-  setIsSending(true);
+  // 🔹 Форматирование текста AI-сообщений
+function formatMessageText(text) {
+  if (!text) return "";
 
-  const userText = inputValue;
-  setInputValue("");
+  const safeText = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
-  // 1. Добавляем сообщение пользователя
-  const userMsg = {
-    message_id: Date.now(), // временный ID
-    sender: "user",
-    text: userText,
-    messaged_at: new Date().toISOString(),
-  };
+  return safeText
+    .replace(/\*([^*]+)\*/g, "<strong>$1</strong>") // *жирный*
+    .replace(/_([^_]+)_/g, "<em>$1</em>")           // _курсив_
+    .replace(/`([^`]+)`/g, "<code>$1</code>")       // `код`
+    .replace(/\n/g, "<br>");
+}
+  // 🔹 Отправка сообщения
+  const handleSend = async () => {
+    if (!inputValue.trim() || isSending) return;
+    setIsSending(true);
 
-  // 2. Добавляем заглушку "loading..."
-  const loadingMsg = {
-    message_id: "loading-" + Date.now(),
-    sender: "system",
-    text: "Systemtica AI формує відповідь...",
-    isLoading: true,
-  };
+    const userText = inputValue;
+    setInputValue("");
 
-  setMessages((prev) => [...prev, userMsg, loadingMsg]);
+    const userMsg = {
+      message_id: Date.now(),
+      sender: "user",
+      text: userText,
+      messaged_at: new Date().toISOString(),
+    };
 
-  try {
-    const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat: chatId,
-        text: userText,
-        file: null,
-      }),
-    });
+    const loadingMsg = {
+      message_id: "loading-" + Date.now(),
+      sender: "system",
+      text: "Systemtica AI формує відповідь...",
+      isLoading: true,
+    };
 
-    if (!resp.ok) {
-      console.error("Ошибка при отправке сообщения:", resp.status);
-      // заменим заглушку на ошибку
+    setMessages((prev) => [...prev, userMsg, loadingMsg]);
+
+    try {
+      const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat: chatId, text: userText, file: null }),
+      });
+
+      if (!resp.ok) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.isLoading ? { ...m, text: "❌ Помилка при генерації" } : m
+          )
+        );
+        return;
+      }
+
+      const data = await resp.json();
+
+      if (data.ai_message) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.isLoading
+              ? {
+                  message_id: data.ai_message.message_id,
+                  sender: "system",
+                  text: data.ai_message.text,
+                  messaged_at: data.ai_message.messaged_at,
+                }
+              : m
+          )
+        );
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.isLoading ? { ...m, text: "⚠️ Відповідь не отримана" } : m
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Ошибка при запросе:", err);
       setMessages((prev) =>
         prev.map((m) =>
-          m.isLoading ? { ...m, text: "❌ Помилка при генерації" } : m
+          m.isLoading ? { ...m, text: "❌ Помилка сервера" } : m
         )
       );
-      return;
+    } finally {
+      setIsSending(false);
     }
-
-    const data = await resp.json();
-    console.log("✅ Ответ от сервера:", data);
-
-    // 3. Обновляем заглушку нормальным сообщением
-    if (data.ai_message) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.isLoading
-            ? {
-                message_id: data.ai_message.message_id,
-                sender: "system",
-                text: data.ai_message.text,
-                messaged_at: data.ai_message.messaged_at,
-              }
-            : m
-        )
-      );
-    } else {
-      // если AI не ответил — заменим заглушку на ошибку
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.isLoading ? { ...m, text: "⚠️ Відповідь не отримана" } : m
-        )
-      );
-    }
-  } catch (err) {
-    console.error("Ошибка при запросе:", err);
-    // заменим заглушку на ошибку
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.isLoading ? { ...m, text: "❌ Помилка сервера" } : m
-      )
-    );
-  } finally {
-    setIsSending(false);  // ✅ разблокируем после ответа
-  }
-};
-
-
+  };
 
   const handleAttachClick = () => fileInputRef.current.click();
 
@@ -194,14 +190,14 @@ function Chat({ id }) {
     <div className="chatContainer">
       <div className="chatContent" ref={chatContentRef}>
         {messages.length === 0 ? (
-          <div className="emptyChat">
-            Повідомлень немає
-          </div>
+          <div className="emptyChat">Повідомлень немає</div>
         ) : (
           messages.map((msg, index) => (
             <div
               key={index}
-              className={`chatMessage ${msg.sender === "user" ? "userMessage" : "systemMessage"}`}
+              className={`chatMessage ${
+                msg.sender === "user" ? "userMessage" : "systemMessage"
+              }`}
             >
               {msg.type === "image" ? (
                 <div>
@@ -209,11 +205,25 @@ function Chat({ id }) {
                   <img
                     src={msg.src}
                     alt={msg.name}
-                    style={{ maxWidth: "200px", borderRadius: "8px", marginTop: "5px" }}
+                    style={{
+                      maxWidth: "200px",
+                      borderRadius: "8px",
+                      marginTop: "5px",
+                    }}
                   />
                 </div>
               ) : (
-                <p className={msg.isLoading ? "loading" : ""}>{msg.text}</p>
+                <p
+                  className={msg.isLoading ? "loading" : ""}
+                  dangerouslySetInnerHTML={{
+                    __html: formatMessageText(msg.text),
+                  }}
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    lineHeight: "1.5",
+                    wordBreak: "break-word",
+                  }}
+                />
               )}
             </div>
           ))
@@ -221,7 +231,6 @@ function Chat({ id }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 🔽 Кнопка "вниз" */}
       {showScrollButton && (
         <button className="scrollButton" onClick={scrollToBottom}>
           <img src={arrowIcon} alt="Вниз" className="scrollIcon" />
@@ -232,7 +241,12 @@ function Chat({ id }) {
         <button className="inputButton" onClick={handleAttachClick}>
           <img className="iconButton" src={plusIcon} alt="Attach" />
         </button>
-        <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileChange} />
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          onChange={handleFileChange}
+        />
 
         <input
           className="inputField"
@@ -240,15 +254,18 @@ function Chat({ id }) {
           placeholder="Напишіть свій запит..."
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !isSending && handleSend()} // ✅ Enter тоже блокируем
-          disabled={isSending} // ✅ блокируем инпут во время отправки
+          onKeyDown={(e) => e.key === "Enter" && !isSending && handleSend()}
+          disabled={isSending}
         />
 
         <button
           className="inputButton"
           onClick={handleSend}
-          disabled={isSending} //block   button
-          style={{ opacity: isSending ? 0.5 : 1, cursor: isSending ? "not-allowed" : "pointer" }}
+          disabled={isSending}
+          style={{
+            opacity: isSending ? 0.5 : 1,
+            cursor: isSending ? "not-allowed" : "pointer",
+          }}
         >
           <img className="iconButton" src={sendIcon} alt="Send" />
         </button>
