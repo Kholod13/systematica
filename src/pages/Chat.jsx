@@ -11,332 +11,227 @@ function Chat({ id }) {
   const chatId = params.id ?? id;
 
   const [messages, setMessages] = useState([]);
-  const [inputValue, setInputValue] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const [expectedAnswer, setExpectedAnswer] = useState("Text"); // 👈 выбор формата ответа
-
-  const fileInputRef = useRef(null);
+  const [text, setText] = useState("");
+  const [file, setFile] = useState(null);
+  const [type, setType] = useState("Text"); // Text, File, Table
   const chatContentRef = useRef(null);
-  const messagesEndRef = useRef(null);
 
-  // 🔹 Загрузка сообщений
-  useEffect(() => {
-    async function loadMessages() {
-      try {
-        const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}?chat=${chatId}`);
-        if (!resp.ok) {
-          console.error("Ошибка при загрузке сообщений:", resp.status);
-          return;
-        }
-        const data = await resp.json();
-        const formatted = data.map((m) => ({
-          message_id: m.message_id,
-          sender: m.is_user ? "user" : "system",
-          text: m.text,
-          file: m.file,
-          filename: m.filename,
-          messaged_at: m.messaged_at,
-        }));
-        setMessages(formatted);
-      } catch (err) {
-        console.error("Ошибка при запросе сообщений:", err);
-      }
+  // Подтягивание сообщений
+  const fetchMessages = async () => {
+    try {
+      const res = await fetchWithAuth(`${ENDPOINTS.MESSAGES}?chat=${chatId}`);
+      const data = await res.json();
+      setMessages(data);
+
+      setTimeout(() => {
+        chatContentRef.current?.scrollTo({ top: chatContentRef.current.scrollHeight, behavior: "smooth" });
+      }, 50);
+    } catch (error) {
+      console.error("Ошибка при загрузке сообщений:", error);
     }
-    loadMessages();
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 5000); // автообновление каждые 5 секунд
+    return () => clearInterval(interval);
   }, [chatId]);
 
-  // 🔹 Автопрокрутка вниз
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // 🔹 Следим за скроллом
-  useEffect(() => {
-    const chatEl = chatContentRef.current;
-    if (!chatEl) return;
-    const handleScroll = () => {
-      const isAtBottom =
-        chatEl.scrollHeight - chatEl.scrollTop <= chatEl.clientHeight + 5;
-      setShowScrollButton(!isAtBottom);
-    };
-    chatEl.addEventListener("scroll", handleScroll);
-    return () => chatEl.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Копирование таблицы
+  const copyTable = (table) => {
+    const header = Object.keys(table[0]).join("\t");
+    const rows = table.map((row) => Object.values(row).join("\t"));
+    const tableText = [header, ...rows].join("\n");
+    navigator.clipboard.writeText(tableText);
   };
 
-  // 🔹 Форматирование текста
-  function formatMessageText(text) {
-    if (!text) return "";
-    const safeText = text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-    return safeText
-      .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
-      .replace(/_([^_]+)_/g, "<em>$1</em>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\n/g, "<br>");
-  }
-
-  // 🔹 Отправка сообщения
+  // Отправка сообщения
   const handleSend = async () => {
-    if (!inputValue.trim() || isSending) return;
-    setIsSending(true);
+    if (!text && !file) return;
 
-    const userText = inputValue;
-    setInputValue("");
+    const formData = new FormData();
+    formData.append("chat", chatId);
+    formData.append("type", type);
+    formData.append("text", text || "");
+    formData.append("table", "null");
+    if (file) formData.append("file", file);
 
-    const userMsg = {
-      message_id: Date.now(),
-      sender: "user",
-      text: userText,
-      messaged_at: new Date().toISOString(),
-    };
-
-    const loadingMsg = {
-      message_id: "loading-" + Date.now(),
-      sender: "system",
-      text: "Systemtica AI формує відповідь...",
-      isLoading: true,
-    };
-
-    setMessages((prev) => [...prev, userMsg, loadingMsg]);
+    // Для отладки: выводим данные в консоль
+    const debugData = {};
+    formData.forEach((value, key) => {
+      // Если value это файл, выводим только имя
+      debugData[key] = value instanceof File ? value.name : value;
+    });
+    console.log("Отправляем на сервер:", debugData);
 
     try {
-      const resp = await fetchWithAuth(`${ENDPOINTS.MESSAGES}`, {
+      const res = await fetchWithAuth(ENDPOINTS.MESSAGES, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat: chatId,
-          text: userText,
-          expected_answer: expectedAnswer, // 👈 добавляем выбор формата
-          file: null,
-        }),
+        body: formData,
       });
 
-      if (!resp.ok) {
-        console.error("Ошибка при отправке:", resp.status);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.isLoading ? { ...m, text: "❌ Помилка при генерації" } : m
-          )
-        );
-        return;
-      }
-
-      const data = await resp.json();
-      console.log("📩 Ответ от сервера:", data);
-
-      if (data.ai_message) {
-        const fileUrl = data.ai_message.file
-          ? `${import.meta.env.VITE_API_BASE_URL || ""}${data.ai_message.file}`
-          : null;
-
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.isLoading
-              ? {
-                  message_id: data.ai_message.message_id,
-                  sender: "system",
-                  text:
-                    data.ai_message.text ||
-                    (fileUrl ? "AI створив файл 📄" : ""),
-                  file: fileUrl,
-                  filename: data.ai_message.filename,
-                  messaged_at: data.ai_message.messaged_at,
-                }
-              : m
-          )
-        );
+      if (res.ok) {
+        setText("");
+        setFile(null);
+        fetchMessages(); // подтягиваем новые сообщения
       } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.isLoading ? { ...m, text: "⚠️ Відповідь не отримана" } : m
-          )
-        );
+        console.error("Ошибка при отправке сообщения");
       }
-    } catch (err) {
-      console.error("Ошибка при запросе:", err);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.isLoading ? { ...m, text: "❌ Помилка сервера" } : m
-        )
-      );
-    } finally {
-      setIsSending(false);
+    } catch (error) {
+      console.error("Ошибка при отправке сообщения:", error);
     }
-  };
-
-  // 🔹 Работа с файлами
-  const handleAttachClick = () => fileInputRef.current.click();
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const newMessage = {
-          sender: "user",
-          type: "image",
-          src: event.target.result,
-          name: file.name,
-        };
-        setMessages((prev) => [...prev, newMessage]);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      const newMessage = { sender: "user", type: "file", text: `📎 ${file.name}` };
-      setMessages((prev) => [...prev, newMessage]);
-    }
-    e.target.value = "";
   };
 
   return (
     <div className="chatContainer">
+      {/* Сообщения */}
       <div className="chatContent" ref={chatContentRef}>
-        {messages.length === 0 ? (
-          <div className="emptyChat">Повідомлень немає</div>
-        ) : (
-          messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`chatMessage ${
-                msg.sender === "user" ? "userMessage" : "systemMessage"
-              }`}
-            >
-              {msg.type === "image" ? (
-                <div>
-                  <p>📷 {msg.name}</p>
-                  <img
-                    src={msg.src}
-                    alt={msg.name}
-                    style={{
-                      maxWidth: "250px",
-                      borderRadius: "8px",
-                      marginTop: "5px",
-                    }}
-                  />
-                </div>
-              ) : msg.file ? (
-                msg.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                  <img
-                    src={msg.file}
-                    alt={msg.filename || "AI-відповідь"}
-                    style={{
-                      maxWidth: "250px",
-                      borderRadius: "8px",
-                      marginTop: "5px",
-                    }}
-                  />
-                ) : (
-                  <div>
-                    <p>📎 {msg.filename || "Файл від AI"}</p>
-                    <a
-                      href={msg.file}
-                      download={msg.filename}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: "#00bfff",
-                        textDecoration: "underline",
-                        fontWeight: "500",
-                      }}
-                    >
-                      Завантажити файл
-                    </a>
-                  </div>
-                )
-              ) : (
-                <p
-                  className={msg.isLoading ? "loading" : ""}
-                  dangerouslySetInnerHTML={{
-                    __html: formatMessageText(msg.text),
-                  }}
+        {messages.length === 0 && <div className="emptyChat">Повідомлень немає</div>}
+
+        {messages.map((msg) => (
+          <div
+            key={msg.message_id}
+            className={`chatMessage ${msg.is_user ? "userMessage" : "systemMessage"}`}
+          >
+            {msg.text && (
+              <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.5, wordBreak: "break-word" }}>
+                {msg.text}
+              </p>
+            )}
+            {msg.file && (
+              <div>
+                <p>📄 {msg.filename}</p>
+                <a
+                  href={msg.file}
+                  download={msg.filename}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "#00bfff", textDecoration: "underline", fontWeight: 500 }}
+                >
+                  Завантажити документ
+                </a>
+              </div>
+            )}
+            {msg.table && msg.table.length > 0 && (
+              <div style={{ marginTop: "5px" }}>
+                <button
                   style={{
-                    whiteSpace: "pre-wrap",
-                    lineHeight: "1.5",
-                    wordBreak: "break-word",
+                    backgroundColor: "#4caf50",
+                    color: "#fff",
+                    border: "none",
+                    padding: "5px 10px",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    marginBottom: "5px",
                   }}
-                />
-              )}
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
+                  onClick={() => copyTable(msg.table)}
+                >
+                  Скопировать
+                </button>
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      borderCollapse: "collapse",
+                      width: "100%",
+                      minWidth: "400px",
+                      tableLayout: "auto",
+                      border: "1px solid #555",
+                    }}
+                  >
+                    <thead style={{ backgroundColor: "#1e1e1e", color: "#fff" }}>
+                      <tr>
+                        {Object.keys(msg.table[0]).map((key) => (
+                          <th
+                            key={key}
+                            style={{ border: "1px solid #555", padding: "8px 12px", textAlign: "left" }}
+                          >
+                            {key}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {msg.table.map((row, i) => (
+                        <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#2a2a2a" : "#1e1e1e" }}>
+                          {Object.values(row).map((val, j) => (
+                            <td
+                              key={j}
+                              style={{
+                                border: "1px solid #555",
+                                padding: "6px 10px",
+                                whiteSpace: "pre-wrap",
+                                wordBreak: "break-word",
+                                color: "#fff",
+                                userSelect: "text",
+                              }}
+                            >
+                              {val}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
-      {showScrollButton && (
-        <button className="scrollButton" onClick={scrollToBottom}>
-          <img src={arrowIcon} alt="Вниз" className="scrollIcon" />
-        </button>
-      )}
+      {/* Скролл-кнопка */}
+      <button
+        className="scrollButton"
+        onClick={() =>
+          chatContentRef.current?.scrollTo({ top: chatContentRef.current.scrollHeight, behavior: "smooth" })
+        }
+      >
+        <img src={arrowIcon} alt="Вниз" className="scrollIcon" />
+      </button>
 
-      {/* 🔹 Радио-кнопки выбора формата */}
-      <div className="formatSelector">
-        <label>
+      {/* Ввод сообщения */}
+      <div className="chatInput" style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <button className="inputButton">
+            <img className="iconButton" src={plusIcon} alt="Attach" />
+          </button>
           <input
-            type="radio"
-            value="Text"
-            checked={expectedAnswer === "Text"}
-            onChange={(e) => setExpectedAnswer(e.target.value)}
+            type="file"
+            onChange={(e) => setFile(e.target.files[0])}
+            style={{ display: "none" }}
+            id="fileInput"
           />
-          Текст
-        </label>
-        <label>
+          <label htmlFor="fileInput" style={{ cursor: "pointer", color: "#00bfff" }}>
+            {file ? file.name : "Прикрепить файл"}
+          </label>
           <input
-            type="radio"
-            value="Table"
-            checked={expectedAnswer === "Table"}
-            onChange={(e) => setExpectedAnswer(e.target.value)}
+            className="inputField"
+            type="text"
+            placeholder="Напишіть свій запит..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            style={{ flex: 1 }}
           />
-          Таблиця
-        </label>
-        <label>
-          <input
-            type="radio"
-            value="Doc"
-            checked={expectedAnswer === "Doc"}
-            onChange={(e) => setExpectedAnswer(e.target.value)}
-          />
-          Документ
-        </label>
-      </div>
+          <button className="inputButton" onClick={handleSend}>
+            <img className="iconButton" src={sendIcon} alt="Send" />
+          </button>
+        </div>
 
-      {/* 🔹 Ввод и кнопки */}
-      <div className="chatInput">
-        <button className="inputButton" onClick={handleAttachClick}>
-          <img className="iconButton" src={plusIcon} alt="Attach" />
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: "none" }}
-          onChange={handleFileChange}
-        />
-        <input
-          className="inputField"
-          type="text"
-          placeholder="Напишіть свій запит..."
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !isSending && handleSend()}
-          disabled={isSending}
-        />
-        <button
-          className="inputButton"
-          onClick={handleSend}
-          disabled={isSending}
-          style={{
-            opacity: isSending ? 0.5 : 1,
-            cursor: isSending ? "not-allowed" : "pointer",
-          }}
-        >
-          <img className="iconButton" src={sendIcon} alt="Send" />
-        </button>
+        {/* Выбор типа ответа */}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <label>
+            <input type="radio" value="Text" checked={type === "Text"} onChange={() => setType("Text")} />
+            Text
+          </label>
+          <label>
+            <input type="radio" value="File" checked={type === "File"} onChange={() => setType("File")} />
+            File
+          </label>
+          <label>
+            <input type="radio" value="Table" checked={type === "Table"} onChange={() => setType("Table")} />
+            Table
+          </label>
+        </div>
       </div>
     </div>
   );
