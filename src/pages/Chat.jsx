@@ -5,6 +5,8 @@ import plusIcon from "../assets/plus-white.png";
 import arrowIcon from "../assets/arrow.png";
 import { fetchWithAuth } from "../services/auth";
 import { ENDPOINTS } from "../services/endpoints";
+import { useCallback } from "react";
+
 
 function Chat({ id }) {
   const params = useParams();
@@ -23,28 +25,25 @@ function Chat({ id }) {
   // ===============================
   // Подтягивание сообщений
   // ===============================
-  const fetchMessages = async () => {
+const fetchMessages = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${ENDPOINTS.MESSAGES}?chat=${chatId}`);
+      if (!res.ok) {
+        console.error("Ошибка при fetchMessages:", res.status);
+        return;
+      }
       const data = await res.json();
       setMessages(data);
-
-      setTimeout(() => {
-        chatContentRef.current?.scrollTo({
-          top: chatContentRef.current.scrollHeight,
-          behavior: "smooth",
-        });
-      }, 50);
-    } catch (error) {
-      console.error("Ошибка при загрузке сообщений:", error);
+    } catch (err) {
+      console.error(err);
     }
-  };
+  }, [chatId]);
 
   useEffect(() => {
+    // Загрузить историю при монтировании — один вызов
     fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
-  }, [chatId]);
+  }, [fetchMessages]);
+
 
   // ===============================
   // Отслеживание скролла
@@ -59,7 +58,9 @@ function Chat({ id }) {
   useEffect(() => {
     const chatDiv = chatContentRef.current;
     if (!chatDiv) return;
-    chatDiv.addEventListener("scroll", handleScroll);
+    chatDiv.addEventListener("scroll", handleScroll, { passive: true });
+    // начальная проверка
+    handleScroll();
     return () => chatDiv.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -88,6 +89,7 @@ function Chat({ id }) {
     formData.append("table", "null");
     if (file) formData.append("file", file);
 
+    // debug лог формы
     const debugData = {};
     formData.forEach((value, key) => {
       debugData[key] = value instanceof File ? value.name : value;
@@ -101,9 +103,14 @@ function Chat({ id }) {
       });
 
       if (res.ok) {
+        // очистить инпуты
         setText("");
         setFile(null);
+
+        // Вариант 4: подтягиваем сообщения **после** отправки
         await fetchMessages();
+        // опционально — пролистать вниз
+        chatContentRef.current?.scrollTo({ top: chatContentRef.current.scrollHeight, behavior: "smooth" });
       } else {
         console.error("Ошибка при отправке сообщения");
       }
