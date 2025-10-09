@@ -14,9 +14,15 @@ function Chat({ id }) {
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
   const [type, setType] = useState("Text"); // Text, File, Table
-  const chatContentRef = useRef(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isSending, setIsSending] = useState(false); // 🔹 Флаг отправки
 
+  const chatContentRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // ===============================
   // Подтягивание сообщений
+  // ===============================
   const fetchMessages = async () => {
     try {
       const res = await fetchWithAuth(`${ENDPOINTS.MESSAGES}?chat=${chatId}`);
@@ -24,7 +30,10 @@ function Chat({ id }) {
       setMessages(data);
 
       setTimeout(() => {
-        chatContentRef.current?.scrollTo({ top: chatContentRef.current.scrollHeight, behavior: "smooth" });
+        chatContentRef.current?.scrollTo({
+          top: chatContentRef.current.scrollHeight,
+          behavior: "smooth",
+        });
       }, 50);
     } catch (error) {
       console.error("Ошибка при загрузке сообщений:", error);
@@ -33,11 +42,30 @@ function Chat({ id }) {
 
   useEffect(() => {
     fetchMessages();
-    const interval = setInterval(fetchMessages, 5000); // автообновление каждые 5 секунд
+    const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
   }, [chatId]);
 
+  // ===============================
+  // Отслеживание скролла
+  // ===============================
+  const handleScroll = () => {
+    if (!chatContentRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContentRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    setShowScrollButton(!isAtBottom);
+  };
+
+  useEffect(() => {
+    const chatDiv = chatContentRef.current;
+    if (!chatDiv) return;
+    chatDiv.addEventListener("scroll", handleScroll);
+    return () => chatDiv.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // ===============================
   // Копирование таблицы
+  // ===============================
   const copyTable = (table) => {
     const header = Object.keys(table[0]).join("\t");
     const rows = table.map((row) => Object.values(row).join("\t"));
@@ -45,9 +73,13 @@ function Chat({ id }) {
     navigator.clipboard.writeText(tableText);
   };
 
+  // ===============================
   // Отправка сообщения
+  // ===============================
   const handleSend = async () => {
-    if (!text && !file) return;
+    if (isSending || (!text && !file)) return;
+
+    setIsSending(true);
 
     const formData = new FormData();
     formData.append("chat", chatId);
@@ -56,10 +88,8 @@ function Chat({ id }) {
     formData.append("table", "null");
     if (file) formData.append("file", file);
 
-    // Для отладки: выводим данные в консоль
     const debugData = {};
     formData.forEach((value, key) => {
-      // Если value это файл, выводим только имя
       debugData[key] = value instanceof File ? value.name : value;
     });
     console.log("Отправляем на сервер:", debugData);
@@ -73,18 +103,23 @@ function Chat({ id }) {
       if (res.ok) {
         setText("");
         setFile(null);
-        fetchMessages(); // подтягиваем новые сообщения
+        await fetchMessages();
       } else {
         console.error("Ошибка при отправке сообщения");
       }
     } catch (error) {
       console.error("Ошибка при отправке сообщения:", error);
+    } finally {
+      setIsSending(false);
     }
   };
 
+  // ===============================
+  // Рендер
+  // ===============================
   return (
     <div className="chatContainer">
-      {/* Сообщения */}
+      {/* Содержимое чата */}
       <div className="chatContent" ref={chatContentRef}>
         {messages.length === 0 && <div className="emptyChat">Повідомлень немає</div>}
 
@@ -94,7 +129,13 @@ function Chat({ id }) {
             className={`chatMessage ${msg.is_user ? "userMessage" : "systemMessage"}`}
           >
             {msg.text && (
-              <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.5, wordBreak: "break-word" }}>
+              <p
+                style={{
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.5,
+                  wordBreak: "break-word",
+                }}
+              >
                 {msg.text}
               </p>
             )}
@@ -106,7 +147,11 @@ function Chat({ id }) {
                   download={msg.filename}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "#00bfff", textDecoration: "underline", fontWeight: 500 }}
+                  style={{
+                    color: "#00bfff",
+                    textDecoration: "underline",
+                    fontWeight: 500,
+                  }}
                 >
                   Завантажити документ
                 </a>
@@ -116,7 +161,7 @@ function Chat({ id }) {
               <div style={{ marginTop: "5px" }}>
                 <button
                   style={{
-                    backgroundColor: "#4caf50",
+                    backgroundColor: "#5C1014",
                     color: "#fff",
                     border: "none",
                     padding: "5px 10px",
@@ -126,7 +171,7 @@ function Chat({ id }) {
                   }}
                   onClick={() => copyTable(msg.table)}
                 >
-                  Скопировать
+                  Копіювати таблицю
                 </button>
                 <div style={{ overflowX: "auto" }}>
                   <table
@@ -134,8 +179,9 @@ function Chat({ id }) {
                       borderCollapse: "collapse",
                       width: "100%",
                       minWidth: "400px",
-                      tableLayout: "auto",
                       border: "1px solid #555",
+                      borderRadius: "8px",
+                      overflow: "hidden",
                     }}
                   >
                     <thead style={{ backgroundColor: "#1e1e1e", color: "#fff" }}>
@@ -143,7 +189,11 @@ function Chat({ id }) {
                         {Object.keys(msg.table[0]).map((key) => (
                           <th
                             key={key}
-                            style={{ border: "1px solid #555", padding: "8px 12px", textAlign: "left" }}
+                            style={{
+                              border: "1px solid #555",
+                              padding: "8px 12px",
+                              textAlign: "left",
+                            }}
                           >
                             {key}
                           </th>
@@ -152,7 +202,12 @@ function Chat({ id }) {
                     </thead>
                     <tbody>
                       {msg.table.map((row, i) => (
-                        <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#2a2a2a" : "#1e1e1e" }}>
+                        <tr
+                          key={i}
+                          style={{
+                            backgroundColor: i % 2 === 0 ? "#2a2a2a" : "#1e1e1e",
+                          }}
+                        >
                           {Object.values(row).map((val, j) => (
                             <td
                               key={j}
@@ -162,7 +217,6 @@ function Chat({ id }) {
                                 whiteSpace: "pre-wrap",
                                 wordBreak: "break-word",
                                 color: "#fff",
-                                userSelect: "text",
                               }}
                             >
                               {val}
@@ -179,58 +233,98 @@ function Chat({ id }) {
         ))}
       </div>
 
-      {/* Скролл-кнопка */}
-      <button
-        className="scrollButton"
-        onClick={() =>
-          chatContentRef.current?.scrollTo({ top: chatContentRef.current.scrollHeight, behavior: "smooth" })
-        }
-      >
-        <img src={arrowIcon} alt="Вниз" className="scrollIcon" />
-      </button>
+      {/* Кнопка скролла вниз */}
+      {showScrollButton && (
+        <button
+          className="scrollButton"
+          onClick={() =>
+            chatContentRef.current?.scrollTo({
+              top: chatContentRef.current.scrollHeight,
+              behavior: "smooth",
+            })
+          }
+        >
+          <img src={arrowIcon} alt="Вниз" className="scrollIcon" />
+        </button>
+      )}
 
-      {/* Ввод сообщения */}
+      {/* Поле ввода */}
       <div className="chatInput" style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <button className="inputButton">
-            <img className="iconButton" src={plusIcon} alt="Attach" />
-          </button>
+          {/* Скрытый input для файла */}
           <input
             type="file"
+            ref={fileInputRef}
             onChange={(e) => setFile(e.target.files[0])}
             style={{ display: "none" }}
-            id="fileInput"
           />
-          <label htmlFor="fileInput" style={{ cursor: "pointer", color: "#00bfff" }}>
-            {file ? file.name : "Прикрепить файл"}
-          </label>
+
+          {/* Кнопка для выбора файла */}
+          <button
+            className="inputButton"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSending}
+            style={{ opacity: isSending ? 0.5 : 1 }}
+          >
+            <img className="iconButton" src={plusIcon} alt="Attach" />
+          </button>
+
+          {/* Поле ввода текста */}
           <input
             className="inputField"
             type="text"
-            placeholder="Напишіть свій запит..."
+            placeholder={isSending ? "Зачекайте..." : "Напишіть свій запит..."}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            style={{ flex: 1 }}
+            onKeyDown={(e) => {
+              if (!isSending && e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            disabled={isSending}
+            style={{ flex: 1, opacity: isSending ? 0.6 : 1 }}
           />
-          <button className="inputButton" onClick={handleSend}>
+
+          {/* Кнопка отправки */}
+          <button
+            className="inputButton"
+            onClick={handleSend}
+            disabled={isSending}
+            style={{
+              opacity: isSending ? 0.5 : 1,
+              cursor: isSending ? "not-allowed" : "pointer",
+            }}
+          >
             <img className="iconButton" src={sendIcon} alt="Send" />
           </button>
         </div>
 
-        {/* Выбор типа ответа */}
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <label>
-            <input type="radio" value="Text" checked={type === "Text"} onChange={() => setType("Text")} />
-            Text
-          </label>
-          <label>
-            <input type="radio" value="File" checked={type === "File"} onChange={() => setType("File")} />
-            File
-          </label>
-          <label>
-            <input type="radio" value="Table" checked={type === "Table"} onChange={() => setType("Table")} />
-            Table
-          </label>
+        {/* Выбор типа сообщения */}
+        <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+          {["Text", "File", "Table"].map((option) => (
+            <button
+              key={option}
+              onClick={() => !isSending && setType(option)}
+              style={{
+                color: type === option ? "#A71A22" : "#ccc",
+                border: 0,
+                background: "transparent",
+                cursor: isSending ? "not-allowed" : "pointer",
+                fontWeight: type === option ? "600" : "400",
+                transition: "color 0.2s ease",
+                opacity: isSending ? 0.5 : 1,
+              }}
+              disabled={isSending}
+            >
+              {option}
+            </button>
+          ))}
+
+          {/* Имя выбранного файла */}
+          {file && (
+            <span style={{ color: "#00bfff", fontSize: "0.8em" }}>{file.name}</span>
+          )}
         </div>
       </div>
     </div>
