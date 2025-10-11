@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import sendIcon from "../assets/send-white.png";
 import plusIcon from "../assets/plus-white.png";
@@ -7,8 +7,6 @@ import arrowIcon from "../assets/arrow.png";
 import { fetchWithAuth } from "../services/auth";
 import { ENDPOINTS } from "../services/endpoints";
 import Settings from "./Settings";
-import { useCallback } from "react";
-
 
 function Agent() {
   const { chatId, agentId } = useParams();
@@ -16,17 +14,17 @@ function Agent() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
-  const [type] = useState("Text");
-  const chatContentRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const [isSending, setIsSending] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [isSending, setIsSending] = useState(false); // 🔹 флаг отправки
 
-// ===============================
-  // Подтягивание сообщений
+  const chatContentRef = useRef(null);
+  const fileInputRef = useRef(null);
+
   // ===============================
-const fetchMessages = useCallback(async () => {
+  // Получение сообщений
+  // ===============================
+  const fetchMessages = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${ENDPOINTS.MESSAGES}?chat=${chatId}`);
       if (!res.ok) {
@@ -35,16 +33,23 @@ const fetchMessages = useCallback(async () => {
       }
       const data = await res.json();
       setMessages(data);
+
+      // 🔹 автоскролл вниз после получения сообщений
+      setTimeout(() => {
+        chatContentRef.current?.scrollTo({
+          top: chatContentRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 50);
+
     } catch (err) {
       console.error(err);
     }
   }, [chatId]);
 
   useEffect(() => {
-    // Загрузить историю при монтировании — один вызов
     fetchMessages();
   }, [fetchMessages]);
-
 
   // ===============================
   // Отслеживание скролла
@@ -54,17 +59,48 @@ const fetchMessages = useCallback(async () => {
     const { scrollTop, scrollHeight, clientHeight } = chatContentRef.current;
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
     setShowScrollButton(!isAtBottom);
+
+    sessionStorage.setItem(`agentChatScroll-${chatId}`, scrollTop);
   };
 
   useEffect(() => {
     const chatDiv = chatContentRef.current;
     if (!chatDiv) return;
     chatDiv.addEventListener("scroll", handleScroll, { passive: true });
-    // начальная проверка
     handleScroll();
     return () => chatDiv.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // ===============================
+  // Таймер бездействия 3 секунды
+  // ===============================
+  useEffect(() => {
+    const chatDiv = chatContentRef.current;
+    if (!chatDiv) return;
+
+    let inactivityTimer;
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        const { scrollTop, scrollHeight, clientHeight } = chatDiv;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+        if (!isAtBottom) {
+          chatDiv.scrollTo({ top: scrollHeight, behavior: "smooth" });
+        }
+      }, 3000); // 3 секунды бездействия
+    };
+
+    chatDiv.addEventListener("mousemove", resetTimer);
+    chatDiv.addEventListener("keydown", resetTimer);
+    resetTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      chatDiv.removeEventListener("mousemove", resetTimer);
+      chatDiv.removeEventListener("keydown", resetTimer);
+    };
+  }, [messages]);
 
   // ===============================
   // Копирование таблицы
@@ -72,56 +108,50 @@ const fetchMessages = useCallback(async () => {
   const copyTable = (table) => {
     const header = Object.keys(table[0]).join("\t");
     const rows = table.map((row) => Object.values(row).join("\t"));
-    const tableText = [header, ...rows].join("\n");
-    navigator.clipboard.writeText(tableText);
+    navigator.clipboard.writeText([header, ...rows].join("\n"));
   };
 
   // ===============================
-    // Отправка сообщения
-    // ===============================
-    const handleSend = async () => {
-      if (isSending || (!text && !file)) return;
-  
-      setIsSending(true);
-  
-      const formData = new FormData();
-      formData.append("chat", chatId);
-      formData.append("type", type);
-      formData.append("text", text || "");
-      formData.append("table", "null");
-      if (file) formData.append("file", file);
-  
-      // debug лог формы
-      const debugData = {};
-      formData.forEach((value, key) => {
-        debugData[key] = value instanceof File ? value.name : value;
+  // Отправка сообщения с автоскроллом
+  // ===============================
+  const handleSend = async () => {
+    if (isSending || (!text && !file)) return;
+
+    setIsSending(true);
+    const formData = new FormData();
+    formData.append("chat", chatId);
+    formData.append("type", "Text");
+    formData.append("text", text || "");
+    formData.append("table", "null");
+    if (file) formData.append("file", file);
+
+    try {
+      const res = await fetchWithAuth(ENDPOINTS.MESSAGES, {
+        method: "POST",
+        body: formData,
       });
-      console.log("Отправляем на сервер:", debugData);
-  
-      try {
-        const res = await fetchWithAuth(ENDPOINTS.MESSAGES, {
-          method: "POST",
-          body: formData,
-        });
-  
-        if (res.ok) {
-          // очистить инпуты
-          setText("");
-          setFile(null);
-  
-          // Вариант 4: подтягиваем сообщения **после** отправки
-          await fetchMessages();
-          // опционально — пролистать вниз
-          chatContentRef.current?.scrollTo({ top: chatContentRef.current.scrollHeight, behavior: "smooth" });
-        } else {
-          console.error("Ошибка при отправке сообщения");
-        }
-      } catch (error) {
-        console.error("Ошибка при отправке сообщения:", error);
-      } finally {
-        setIsSending(false);
+
+      if (res.ok) {
+        setText("");
+        setFile(null);
+        await fetchMessages();
+
+        // 🔹 автоскролл вниз после отправки сообщения
+        setTimeout(() => {
+          chatContentRef.current?.scrollTo({
+            top: chatContentRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }, 50);
+      } else {
+        console.error("Ошибка при отправке сообщения");
       }
-    };
+    } catch (error) {
+      console.error("Ошибка при отправке сообщения:", error);
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   // ===============================
   // Рендер
@@ -132,7 +162,6 @@ const fetchMessages = useCallback(async () => {
         <Settings agentId={agentId} onBack={() => setShowSettings(false)} />
       ) : (
         <>
-          {/* Сообщения */}
           <div className="chatContent" ref={chatContentRef}>
             {messages.length === 0 && (
               <div className="emptyChat">Повідомлень немає</div>
@@ -141,7 +170,9 @@ const fetchMessages = useCallback(async () => {
             {messages.map((msg) => (
               <div
                 key={msg.message_id}
-                className={`chatMessage ${msg.is_user ? "userMessage" : "systemMessage"}`}
+                className={`chatMessage ${
+                  msg.is_user ? "userMessage" : "systemMessage"
+                }`}
               >
                 {msg.text && (
                   <p
@@ -154,6 +185,7 @@ const fetchMessages = useCallback(async () => {
                     {msg.text}
                   </p>
                 )}
+
                 {msg.file && (
                   <div>
                     <p>📄 {msg.filename}</p>
@@ -172,6 +204,7 @@ const fetchMessages = useCallback(async () => {
                     </a>
                   </div>
                 )}
+
                 {msg.table && msg.table.length > 0 && (
                   <div style={{ marginTop: "5px" }}>
                     <button
@@ -198,7 +231,9 @@ const fetchMessages = useCallback(async () => {
                           border: "1px solid #555",
                         }}
                       >
-                        <thead style={{ backgroundColor: "#1e1e1e", color: "#fff" }}>
+                        <thead
+                          style={{ backgroundColor: "#1e1e1e", color: "#fff" }}
+                        >
                           <tr>
                             {Object.keys(msg.table[0]).map((key) => (
                               <th
@@ -249,7 +284,6 @@ const fetchMessages = useCallback(async () => {
             ))}
           </div>
 
-          {/* Кнопка "вниз" */}
           {showScrollButton && (
             <button
               className="scrollButton"
@@ -263,78 +297,79 @@ const fetchMessages = useCallback(async () => {
               <img src={arrowIcon} alt="Вниз" className="scrollIcon" />
             </button>
           )}
+
+          <div
+            className="chatInput"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "5px",
+              marginTop: "10px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => setFile(e.target.files[0])}
+                style={{ display: "none" }}
+              />
+
+              <button
+                className="inputButton"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending}
+              >
+                <img className="iconButton" src={plusIcon} alt="Attach" />
+              </button>
+
+              <button
+                className="inputButton"
+                onClick={() => setShowSettings(true)}
+                disabled={isSending}
+              >
+                <img className="iconButton" src={questionIcon} alt="Settings" />
+              </button>
+
+              <input
+                className="inputField"
+                type="text"
+                placeholder={
+                  isSending ? "Зачекайте..." : "Напишіть свій запит..."
+                }
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (!isSending && e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                disabled={isSending}
+                style={{ flex: 1 }}
+              />
+
+              <button
+                className="inputButton"
+                onClick={handleSend}
+                disabled={isSending}
+                style={{
+                  opacity: isSending ? 0.5 : 1,
+                  cursor: isSending ? "not-allowed" : "pointer",
+                }}
+              >
+                <img className="iconButton" src={sendIcon} alt="Send" />
+              </button>
+            </div>
+
+            {file && (
+              <div style={{ marginLeft: "10px", color: "#00bfff" }}>
+                {file.name}
+              </div>
+            )}
+          </div>
         </>
       )}
-
-      {/* Ввод сообщения */}
-      <div className="chatInput" style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          {/* Скрытый input для файла */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={(e) => setFile(e.target.files[0])}
-            style={{ display: "none" }}
-          />
-
-          {/* Кнопка с плюсом */}
-          <button
-            className="inputButton"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isSending}
-            style={{ opacity: isSending ? 0.5 : 1 }}
-          >
-            <img className="iconButton" src={plusIcon} alt="Attach" />
-          </button>
-
-          {/* Кнопка настроек */}
-          <button
-            className="inputButton"
-            onClick={() => setShowSettings(true)}
-            disabled={isSending}
-            style={{ opacity: isSending ? 0.5 : 1 }}
-          >
-            <img className="iconButton" src={questionIcon} alt="Settings" />
-          </button>
-
-          {/* Поле ввода */}
-          <input
-            className="inputField"
-            type="text"
-            placeholder={isSending ? "Зачекайте..." : "Напишіть свій запит..."}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (!isSending && e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            disabled={isSending}
-            style={{ flex: 1, opacity: isSending ? 0.6 : 1 }}
-          />
-
-          {/* Отправка */}
-          <button
-            className="inputButton"
-            onClick={handleSend}
-            disabled={isSending}
-            style={{
-              opacity: isSending ? 0.5 : 1,
-              cursor: isSending ? "not-allowed" : "pointer",
-            }}
-          >
-            <img className="iconButton" src={sendIcon} alt="Send" />
-          </button>
-        </div>
-
-        {/* Имя файла */}
-        <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-          {file && (
-            <span style={{ color: "#00bfff", fontSize: "0.9em" }}>{file.name}</span>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

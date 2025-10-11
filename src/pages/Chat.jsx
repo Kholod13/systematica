@@ -1,12 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import sendIcon from "../assets/send-white.png";
 import plusIcon from "../assets/plus-white.png";
 import arrowIcon from "../assets/arrow.png";
 import { fetchWithAuth } from "../services/auth";
 import { ENDPOINTS } from "../services/endpoints";
-import { useCallback } from "react";
-
 
 function Chat({ id }) {
   const params = useParams();
@@ -15,58 +13,107 @@ function Chat({ id }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
-  const [type, setType] = useState("Text"); // Text, File, Table
+  const [fileKey, setFileKey] = useState(0);
+  const [type, setType] = useState("Text");
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [isSending, setIsSending] = useState(false); // 🔹 Флаг отправки
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState("");
 
   const chatContentRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // ===============================
-  // Подтягивание сообщений
-  // ===============================
-const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${ENDPOINTS.MESSAGES}?chat=${chatId}`);
-      if (!res.ok) {
-        console.error("Ошибка при fetchMessages:", res.status);
-        return;
-      }
+      if (!res.ok) return;
       const data = await res.json();
       setMessages(data);
+
+      // 🔹 автоскролл после получения сообщений
+      setTimeout(() => {
+        const chatDiv = chatContentRef.current;
+        if (!chatDiv) return;
+
+        const savedScroll = sessionStorage.getItem(`chatScroll-${chatId}`);
+        if (savedScroll) {
+          chatDiv.scrollTop = parseInt(savedScroll, 10);
+        } else {
+          chatDiv.scrollTo({ top: chatDiv.scrollHeight, behavior: "smooth" });
+        }
+      }, 50);
     } catch (err) {
       console.error(err);
     }
   }, [chatId]);
 
   useEffect(() => {
-    // Загрузить историю при монтировании — один вызов
     fetchMessages();
   }, [fetchMessages]);
 
-
-  // ===============================
-  // Отслеживание скролла
-  // ===============================
   const handleScroll = () => {
     if (!chatContentRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = chatContentRef.current;
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
     setShowScrollButton(!isAtBottom);
+
+    // 🔹 сохраняем позицию чата
+    sessionStorage.setItem(`chatScroll-${chatId}`, scrollTop);
   };
 
   useEffect(() => {
     const chatDiv = chatContentRef.current;
     if (!chatDiv) return;
     chatDiv.addEventListener("scroll", handleScroll, { passive: true });
-    // начальная проверка
     handleScroll();
     return () => chatDiv.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // ===============================
-  // Копирование таблицы
-  // ===============================
+  // 🔹 Автоскролл при 3 секундах бездействия
+  useEffect(() => {
+    const chatDiv = chatContentRef.current;
+    if (!chatDiv) return;
+
+    let inactivityTimer;
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        const { scrollTop, scrollHeight, clientHeight } = chatDiv;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+        if (!isAtBottom) {
+          chatDiv.scrollTo({ top: scrollHeight, behavior: "smooth" });
+        }
+      }, 3000); // 3 секунды бездействия
+    };
+
+    chatDiv.addEventListener("mousemove", resetTimer);
+    chatDiv.addEventListener("keydown", resetTimer);
+    resetTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      chatDiv.removeEventListener("mousemove", resetTimer);
+      chatDiv.removeEventListener("keydown", resetTimer);
+    };
+  }, [messages]);
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+
+    const allowedExtensions = [".doc", ".docx"];
+    const ext = selectedFile.name.slice(selectedFile.name.lastIndexOf(".")).toLowerCase();
+
+    if (!allowedExtensions.includes(ext)) {
+      setError("⚠️ Дозволено тільки файли формату .doc або .docx");
+      setFile(null);
+      e.target.value = "";
+    } else {
+      setError("");
+      setFile(selectedFile);
+    }
+  };
+
   const copyTable = (table) => {
     const header = Object.keys(table[0]).join("\t");
     const rows = table.map((row) => Object.values(row).join("\t"));
@@ -74,12 +121,14 @@ const fetchMessages = useCallback(async () => {
     navigator.clipboard.writeText(tableText);
   };
 
-  // ===============================
-  // Отправка сообщения
-  // ===============================
   const handleSend = async () => {
-    if (isSending || (!text && !file)) return;
+    if (isSending) return;
+    if (!text && !file) {
+      setError("⚠️ Поле повідомлення порожнє");
+      return;
+    }
 
+    setError("");
     setIsSending(true);
 
     const formData = new FormData();
@@ -89,13 +138,6 @@ const fetchMessages = useCallback(async () => {
     formData.append("table", "null");
     if (file) formData.append("file", file);
 
-    // debug лог формы
-    const debugData = {};
-    formData.forEach((value, key) => {
-      debugData[key] = value instanceof File ? value.name : value;
-    });
-    console.log("Отправляем на сервер:", debugData);
-
     try {
       const res = await fetchWithAuth(ENDPOINTS.MESSAGES, {
         method: "POST",
@@ -103,144 +145,136 @@ const fetchMessages = useCallback(async () => {
       });
 
       if (res.ok) {
-        // очистить инпуты
         setText("");
         setFile(null);
+        setFileKey((k) => k + 1);
 
-        // Вариант 4: подтягиваем сообщения **после** отправки
         await fetchMessages();
-        // опционально — пролистать вниз
-        chatContentRef.current?.scrollTo({ top: chatContentRef.current.scrollHeight, behavior: "smooth" });
+
+        // 🔹 автоскролл вниз после отправки
+        setTimeout(() => {
+          const chatDiv = chatContentRef.current;
+          chatDiv?.scrollTo({ top: chatDiv.scrollHeight, behavior: "smooth" });
+        }, 50);
       } else {
-        console.error("Ошибка при отправке сообщения");
+        setError("⚠️ Помилка при відправці повідомлення");
       }
     } catch (error) {
-      console.error("Ошибка при отправке сообщения:", error);
+      console.error("Помилка при відправці повідомлення:", error);
+      setError("⚠️ Помилка мережі або сервера");
     } finally {
       setIsSending(false);
     }
   };
 
-  // ===============================
-  // Рендер
-  // ===============================
   return (
     <div className="chatContainer">
-      {/* Содержимое чата */}
       <div className="chatContent" ref={chatContentRef}>
         {messages.length === 0 && <div className="emptyChat">Повідомлень немає</div>}
 
-        {messages.map((msg) => (
-          <div
-            key={msg.message_id}
-            className={`chatMessage ${msg.is_user ? "userMessage" : "systemMessage"}`}
-          >
-            {msg.text && (
-              <p
-                style={{
-                  whiteSpace: "pre-wrap",
-                  lineHeight: 1.5,
-                  wordBreak: "break-word",
-                }}
-              >
-                {msg.text}
-              </p>
-            )}
-            {msg.file && (
-              <div>
-                <p>📄 {msg.filename}</p>
-                <a
-                  href={msg.file}
-                  download={msg.filename}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "#00bfff",
-                    textDecoration: "underline",
-                    fontWeight: 500,
-                  }}
-                >
-                  Завантажити документ
-                </a>
-              </div>
-            )}
-            {msg.table && msg.table.length > 0 && (
-              <div style={{ marginTop: "5px" }}>
-                <button
-                  style={{
-                    backgroundColor: "#5C1014",
-                    color: "#fff",
-                    border: "none",
-                    padding: "5px 10px",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    marginBottom: "5px",
-                  }}
-                  onClick={() => copyTable(msg.table)}
-                >
-                  Копіювати таблицю
-                </button>
-                <div style={{ overflowX: "auto" }}>
-                  <table
+        {messages.map((msg) => {
+          let parsedTable = msg.table;
+          if (typeof parsedTable === "string") {
+            try {
+              parsedTable = JSON.parse(parsedTable);
+            } catch {
+              parsedTable = [];
+            }
+          }
+
+          return (
+            <div
+              key={msg.message_id}
+              className={`chatMessage ${msg.is_user ? "userMessage" : "systemMessage"}`}
+            >
+              {msg.text && <p style={{ whiteSpace: "pre-wrap" }}>{msg.text}</p>}
+              {msg.file && (
+                <div>
+                  <p>📄 {msg.filename}</p>
+                  <a href={msg.file} download={msg.filename} target="_blank" rel="noopener noreferrer">
+                    Завантажити документ
+                  </a>
+                </div>
+              )}
+
+              {parsedTable && parsedTable.length > 0 && (
+                <div style={{ marginTop: "5px" }}>
+                  <button
                     style={{
-                      borderCollapse: "collapse",
-                      width: "100%",
-                      minWidth: "400px",
-                      border: "1px solid #555",
-                      borderRadius: "8px",
-                      overflow: "hidden",
+                      backgroundColor: "#5C1014",
+                      color: "#fff",
+                      border: "none",
+                      padding: "5px 10px",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      marginBottom: "5px",
                     }}
+                    onClick={() => copyTable(parsedTable)}
                   >
-                    <thead style={{ backgroundColor: "#1e1e1e", color: "#fff" }}>
-                      <tr>
-                        {Object.keys(msg.table[0]).map((key) => (
-                          <th
-                            key={key}
-                            style={{
-                              border: "1px solid #555",
-                              padding: "8px 12px",
-                              textAlign: "left",
-                            }}
-                          >
-                            {key}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {msg.table.map((row, i) => (
-                        <tr
-                          key={i}
-                          style={{
-                            backgroundColor: i % 2 === 0 ? "#2a2a2a" : "#1e1e1e",
-                          }}
-                        >
-                          {Object.values(row).map((val, j) => (
-                            <td
-                              key={j}
+                    Копіювати таблицю
+                  </button>
+
+                  <div style={{ overflowX: "auto" }}>
+                    <table
+                      style={{
+                        borderCollapse: "collapse",
+                        width: "100%",
+                        minWidth: "400px",
+                        border: "1px solid #555",
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <thead style={{ backgroundColor: "#1e1e1e", color: "#fff" }}>
+                        <tr>
+                          {Object.keys(parsedTable[0]).map((key) => (
+                            <th
+                              key={key}
                               style={{
                                 border: "1px solid #555",
-                                padding: "6px 10px",
-                                whiteSpace: "pre-wrap",
-                                wordBreak: "break-word",
-                                color: "#fff",
+                                padding: "8px 12px",
+                                textAlign: "left",
                               }}
                             >
-                              {val}
-                            </td>
+                              {key}
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {parsedTable.map((row, i) => (
+                          <tr
+                            key={i}
+                            style={{
+                              backgroundColor: i % 2 === 0 ? "#2a2a2a" : "#1e1e1e",
+                            }}
+                          >
+                            {Object.values(row).map((val, j) => (
+                              <td
+                                key={j}
+                                style={{
+                                  border: "1px solid #555",
+                                  padding: "6px 10px",
+                                  whiteSpace: "pre-wrap",
+                                  wordBreak: "break-word",
+                                  color: "#fff",
+                                }}
+                              >
+                                {val}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Кнопка скролла вниз */}
       {showScrollButton && (
         <button
           className="scrollButton"
@@ -255,18 +289,16 @@ const fetchMessages = useCallback(async () => {
         </button>
       )}
 
-      {/* Поле ввода */}
       <div className="chatInput" style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          {/* Скрытый input для файла */}
           <input
+            key={fileKey}
             type="file"
             ref={fileInputRef}
-            onChange={(e) => setFile(e.target.files[0])}
+            onChange={handleFileChange}
             style={{ display: "none" }}
           />
 
-          {/* Кнопка для выбора файла */}
           <button
             className="inputButton"
             onClick={() => fileInputRef.current?.click()}
@@ -276,7 +308,6 @@ const fetchMessages = useCallback(async () => {
             <img className="iconButton" src={plusIcon} alt="Attach" />
           </button>
 
-          {/* Поле ввода текста */}
           <input
             className="inputField"
             type="text"
@@ -293,7 +324,6 @@ const fetchMessages = useCallback(async () => {
             style={{ flex: 1, opacity: isSending ? 0.6 : 1 }}
           />
 
-          {/* Кнопка отправки */}
           <button
             className="inputButton"
             onClick={handleSend}
@@ -307,7 +337,6 @@ const fetchMessages = useCallback(async () => {
           </button>
         </div>
 
-        {/* Выбор типа сообщения */}
         <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
           {["Text", "File", "Table"].map((option) => (
             <button
@@ -328,9 +357,10 @@ const fetchMessages = useCallback(async () => {
             </button>
           ))}
 
-          {/* Имя выбранного файла */}
-          {file && (
-            <span style={{ color: "#00bfff", fontSize: "0.8em" }}>{file.name}</span>
+          {file && <span style={{ color: "#00bfff", fontSize: "0.8em" }}>{file.name}</span>}
+
+          {error && (
+            <div style={{ color: "#ff4444", fontSize: "0.8em", textAlign: "center" }}>{error}</div>
           )}
         </div>
       </div>

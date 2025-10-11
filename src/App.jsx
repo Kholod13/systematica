@@ -4,6 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import Agent from "./pages/Agent";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route index element={<Chat id="0" />} />
           <Route path="chat/:id" element={<Chat />} />
           <Route path="agent/:chatId/:agentId" element={<Agent />} />
+          <Route path="settings/:agentId" element={<Settings />} />  {/* ← вот это добавь */}
         </Route>
 
         {/* Если корень — редиректим на /login */}

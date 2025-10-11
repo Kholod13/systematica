@@ -37,7 +37,6 @@ function Dashboard() {
   }
 
   // Load chats and redirect to first agent/chat
-
   useEffect(() => {
     async function loadChats() {
       try {
@@ -49,8 +48,9 @@ function Dashboard() {
           setChats(onlyChats);
           setAgentChats(onlyAgentChats);
 
-          // редирект только один раз
-          if (!hasRedirected) {
+          // 🔹 редиректим только если текущий путь — /dashboard
+          const path = window.location.pathname;
+          if (!hasRedirected && (path === "/dashboard" || path === "/dashboard/")) {
             if (onlyAgentChats.length > 0) {
               navigate(`agent/${onlyAgentChats[0].chat_id}/${onlyAgentChats[0].agent}`, { replace: true });
             } else if (onlyChats.length > 0) {
@@ -94,11 +94,9 @@ function Dashboard() {
 
       if (!newChat.agent || newChat.agent === 0) {
         setChats((prev) => [...prev, newChat]);
-        // 🔹 редиректим сразу на созданный обычный чат
         navigate(`chat/${newChat.chat_id}`, { replace: true });
       } else {
         setAgentChats((prev) => [...prev, newChat]);
-        // 🔹 редиректим на агентский чат
         navigate(`agent/${newChat.chat_id}/${newChat.agent}`, { replace: true });
       }
 
