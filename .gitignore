@@ -42,3 +42,5 @@ lap
 
 # Optional: macOS / Linux / Windows junk
 Thumbs.db
+
+.env
